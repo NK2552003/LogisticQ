@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { Eye, EyeOff, Lock, Mail, User } from "lucide-react-native";
 import React, { useState } from "react";
-import { Alert, SafeAreaView, StatusBar, Text, View } from "react-native";
+import { Alert, SafeAreaView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 import { useSignUp } from '@clerk/clerk-expo';
 import { AuthFooter } from "../components/AuthFooter";
 import { CustomCheckbox } from "../components/CustomCheckbox";
@@ -139,7 +139,7 @@ const SignUp = () => {
         <StatusBar barStyle="dark-content" backgroundColor="#f9fafb" />
         <Header />
         
-        <View className="flex-1 px-6 mt-8 top-28 relative">
+        <View className="flex-1 px-6 mt-8 top-32 relative">
           <Text className="text-3xl font-bold text-gray-900 text-center mb-4">
             Verify Your Email
           </Text>
@@ -163,14 +163,13 @@ const SignUp = () => {
               disabled={isLoading}
             />
 
-            <View className="items-center">
+            <View className="items-center w-full">
               <Text className="text-gray-500 mb-4">
                 Didn't receive the code?
               </Text>
-              <PrimaryButton
-                title="Resend Code"
-                onPress={resendCode}
-              />
+              <TouchableOpacity onPress={resendCode} className="border border-yellow-500 w-full items-center justify-center px-3 py-4 rounded-3xl">
+                <Text className="font-bold text-yellow-500">Resend Code</Text>
+              </TouchableOpacity>
             </View>
 
             <AuthFooter
