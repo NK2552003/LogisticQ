@@ -1,4 +1,5 @@
 // screens/Login.tsx
+import { useSignIn } from '@clerk/clerk-expo';
 import { router } from "expo-router";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react-native";
 import React, { useState } from "react";
@@ -8,6 +9,7 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Alert,
 } from "react-native";
 import { AuthFooter } from "../components/AuthFooter";
 import { CustomCheckbox } from "../components/CustomCheckbox";
@@ -18,6 +20,7 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { SocialButton } from "../components/SocialButton";
 
 const Login = () => {
+  const { signIn, setActive, isLoaded } = useSignIn();
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState(false);
@@ -25,27 +28,62 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
-    setIsLoading(true);
-    // Add your login logic here
-    console.log("Login attempt:", { email, password, rememberMe });
+    if (!isLoaded) return;
     
-    // Simulate API call
-    setTimeout(() => {
+    setIsLoading(true);
+    
+    try {
+      // Start the sign-in process using the email and password provided
+      const signInAttempt = await signIn.create({
+        identifier: email,
+        password,
+      });
+
+      // If sign-in process is complete, set the created session as active
+      // and redirect the user
+      if (signInAttempt.status === 'complete') {
+        await setActive({ session: signInAttempt.createdSessionId });
+        router.replace('/(root)/(tabs)/home'); // Navigate to your main app
+      } else {
+        // If the status isn't complete, check why. User might need to
+        // complete further steps.
+        console.error(JSON.stringify(signInAttempt, null, 2));
+        Alert.alert('Sign In', 'Please complete the additional steps required.');
+      }
+    } catch (err: any) {
+      // Handle authentication errors
+      console.error(JSON.stringify(err, null, 2));
+      
+      // Show user-friendly error message
+      const errorMessage = err.errors?.[0]?.message || 'An error occurred during sign in';
+      Alert.alert('Sign In Failed', errorMessage);
+    } finally {
       setIsLoading(false);
-      // Navigate to main app or handle login success
-      // router.push("/(tabs)/home");
-    }, 2000);
+    }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     console.log("Google login pressed");
-    // Add Google authentication logic here
+    // Add Google OAuth logic here using Clerk
+    // You'll need to set up Google OAuth in your Clerk dashboard
+    // and implement the OAuth flow
+    try {
+      // Example implementation would go here
+      // const googleSignIn = await signIn.authenticateWithRedirect({
+      //   strategy: 'oauth_google',
+      //   redirectUrl: '/sso-callback',
+      //   redirectUrlComplete: '/(tabs)/home'
+      // });
+      Alert.alert('Coming Soon', 'Google sign-in will be implemented soon.');
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+    }
   };
 
   const handleForgotPassword = () => {
     console.log("Forgot password pressed");
     // Navigate to forgot password screen
-    // router.push("/(auth)/forgot-password");
+    router.push("/(auth)/forgot-password");
   };
 
   const handleSignUpNavigation = () => {
@@ -82,7 +120,7 @@ const Login = () => {
             onChangeText={setPassword}
             placeholder="Enter your password"
             icon={Lock}
-            secureTextEntry
+            secureTextEntry={!showPassword}
             showSecureText={showPassword}
             onToggleSecureText={() => setShowPassword(!showPassword)}
             rightIcon={showPassword ? EyeOff : Eye}
@@ -108,7 +146,7 @@ const Login = () => {
             title="Login"
             onPress={handleLogin}
             loading={isLoading}
-            disabled={!email || !password}
+            disabled={!email || !password || !isLoaded}
           />
 
           {/* Or Login With */}
