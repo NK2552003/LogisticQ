@@ -27,7 +27,12 @@
       "bundler": "metro"
     },
     "plugins": [
-      ["expo-router",{"origin":"http://localhost:8081"}],
+      [
+        "expo-router",
+        {
+          "origin": "http://localhost:8081"
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -38,8 +43,9 @@
           "dark": {
             "backgroundColor": "#000000"
           }
-        },
+        }
       ],
+      "expo-maps"
     ],
     "experiments": {
       "typedRoutes": true,

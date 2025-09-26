@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -8,9 +8,13 @@ import {
     SafeAreaView,
     Dimensions,
     ActivityIndicator,
+    RefreshControl,
+    Alert,
 } from 'react-native';
 import { useUser } from "@clerk/clerk-expo";
+import { useRouter } from 'expo-router';
 import { fetchAPI } from "../../lib/fetch";
+import * as Location from 'expo-location';
 import { 
     Package, 
     Truck, 
@@ -26,7 +30,10 @@ import {
     Users,
     DollarSign,
     Star,
-    Plus
+    Plus,
+    Map,
+    Calendar,
+    Settings
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -37,6 +44,7 @@ interface StatCard {
     change: string;
     color: string;
     icon: React.ReactNode;
+    onPress?: () => void;
 }
 
 interface RecentActivity {
@@ -48,35 +56,221 @@ interface RecentActivity {
     status: 'completed' | 'pending' | 'issue';
 }
 
+interface UserProfile {
+    id: string;
+    role: string;
+    name: string;
+    email: string;
+    phone?: string;
+}
+
 const Home = () => {
     const { user, isLoaded } = useUser();
-    const [userRole, setUserRole] = useState<string | null>(null);
+    const router = useRouter();
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [dashboardData, setDashboardData] = useState<any>(null);
+    const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
+    const [location, setLocation] = useState<Location.LocationObject | null>(null);
 
-    useEffect(() => {
-        const fetchUserRole = async () => {
-            if (!isLoaded || !user?.id) {
-                setIsLoading(false);
-                return;
+    // Fetch user profile and dashboard data
+    const fetchDashboardData = useCallback(async () => {
+        if (!isLoaded || !user?.id) return;
+
+        try {
+            setIsLoading(true);
+            
+            // Get user profile
+            const userResponse = await fetchAPI(`/user?clerkUserId=${user.id}`);
+            if (userResponse.user) {
+                setUserProfile(userResponse.user);
+                
+                // Fetch role-specific dashboard data
+                await fetchRoleSpecificData(userResponse.user);
+            }
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [isLoaded, user?.id]);
+
+    const fetchRoleSpecificData = async (profile: UserProfile) => {
+        try {
+            const role = profile.role;
+            let data = {};
+
+            if (role === 'transporter') {
+                // Fetch driver earnings, active jobs, ratings
+                const [shipmentsRes, paymentsRes] = await Promise.all([
+                    fetchAPI(`/shipments?driverId=${profile.id}&status=active`),
+                    fetchAPI(`/payments?userId=${profile.id}&role=transporter`)
+                ]);
+                
+                data = {
+                    activeJobs: shipmentsRes.data?.length || 0,
+                    todayEarnings: calculateTodayEarnings(paymentsRes.data || []),
+                    totalEarnings: calculateTotalEarnings(paymentsRes.data || []),
+                    rating: 4.8, // This should come from ratings API
+                    totalDeliveries: paymentsRes.data?.length || 0
+                };
+            } else if (role === 'business' || role === 'customer') {
+                // Fetch shipments data
+                const shipmentsRes = await fetchAPI(`/shipments?customerId=${profile.id}`);
+                const shipments = shipmentsRes.data || [];
+                
+                data = {
+                    activeShipments: shipments.filter((s: any) => ['pending', 'picked_up', 'in_transit'].includes(s.status)).length,
+                    delivered: shipments.filter((s: any) => s.status === 'delivered').length,
+                    inTransit: shipments.filter((s: any) => s.status === 'in_transit').length,
+                    issues: shipments.filter((s: any) => s.status === 'issue').length,
+                    totalShipments: shipments.length
+                };
+            } else if (role === 'admin') {
+                // Fetch admin overview data
+                const [usersRes, shipmentsRes, paymentsRes] = await Promise.all([
+                    fetchAPI('/drivers'),
+                    fetchAPI('/shipments'),
+                    fetchAPI('/payments')
+                ]);
+                
+                data = {
+                    totalUsers: usersRes.data?.length || 0,
+                    activeShipments: shipmentsRes.data?.filter((s: any) => ['pending', 'picked_up', 'in_transit'].includes(s.status)).length || 0,
+                    totalRevenue: calculateTotalRevenue(paymentsRes.data || []),
+                    disputes: shipmentsRes.data?.filter((s: any) => s.status === 'issue').length || 0
+                };
             }
 
-            try {
-                const response = await fetchAPI(`/user?clerkUserId=${user.id}`, {
-                    method: 'GET',
-                });
+            setDashboardData(data);
+            
+            // Set recent activities based on role
+            if (role === 'transporter') {
+                const activities = await fetchTransporterActivities(profile.id);
+                setRecentActivities(activities);
+            } else {
+                const activities = await fetchCustomerActivities(profile.id);
+                setRecentActivities(activities);
+            }
+            
+        } catch (error) {
+            console.error('Error fetching role-specific data:', error);
+        }
+    };
 
-                if (response.user) {
-                    setUserRole(response.user.role);
+    const fetchTransporterActivities = async (userId: string): Promise<RecentActivity[]> => {
+        try {
+            const response = await fetchAPI(`/shipments?driverId=${userId}&limit=5`);
+            return (response.data || []).map((shipment: any) => ({
+                id: shipment.id,
+                type: shipment.status === 'delivered' ? 'delivery' : 'pickup',
+                title: shipment.status === 'delivered' ? 'Package Delivered' : 'Pickup Scheduled',
+                subtitle: `${shipment.pickup_address} → ${shipment.delivery_address}`,
+                time: formatTime(shipment.updated_at),
+                status: shipment.status === 'delivered' ? 'completed' : 'pending'
+            }));
+        } catch (error) {
+            console.error('Error fetching transporter activities:', error);
+            return [];
+        }
+    };
+
+    const fetchCustomerActivities = async (userId: string): Promise<RecentActivity[]> => {
+        try {
+            const response = await fetchAPI(`/shipments?customerId=${userId}&limit=5`);
+            return (response.data || []).map((shipment: any) => ({
+                id: shipment.id,
+                type: shipment.status === 'delivered' ? 'delivery' : 'pickup',
+                title: shipment.status === 'delivered' ? 'Package Delivered' : 'Shipment in Progress',
+                subtitle: `${shipment.pickup_address} → ${shipment.delivery_address}`,
+                time: formatTime(shipment.updated_at),
+                status: shipment.status === 'delivered' ? 'completed' : shipment.status === 'issue' ? 'issue' : 'pending'
+            }));
+        } catch (error) {
+            console.error('Error fetching customer activities:', error);
+            return [];
+        }
+    };
+
+    // Helper functions
+    const calculateTodayEarnings = (payments: any[]) => {
+        const today = new Date().toDateString();
+        return payments
+            .filter(p => new Date(p.created_at).toDateString() === today)
+            .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+    };
+
+    const calculateTotalEarnings = (payments: any[]) => {
+        return payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+    };
+
+    const calculateTotalRevenue = (payments: any[]) => {
+        return payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+    };
+
+    const formatTime = (timestamp: string) => {
+        const now = new Date();
+        const time = new Date(timestamp);
+        const diff = now.getTime() - time.getTime();
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        
+        if (hours < 1) return 'Just now';
+        if (hours < 24) return `${hours} hours ago`;
+        return `${Math.floor(hours / 24)} days ago`;
+    };
+
+    // Location tracking for transporters
+    useEffect(() => {
+        const setupLocationTracking = async () => {
+            if (userProfile?.role === 'transporter') {
+                try {
+                    let { status } = await Location.requestForegroundPermissionsAsync();
+                    if (status !== 'granted') {
+                        Alert.alert(
+                            'Location Permission Required',
+                            'Please enable location services to track your deliveries',
+                            [{ text: 'OK', onPress: () => {} }]
+                        );
+                        return;
+                    }
+
+                    let location = await Location.getCurrentPositionAsync({});
+                    setLocation(location);
+
+                    // Update location in database
+                    await fetchAPI('/user/transporter-profile', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId: userProfile.id,
+                            current_latitude: location.coords.latitude,
+                            current_longitude: location.coords.longitude,
+                            is_available: true
+                        })
+                    });
+                } catch (error) {
+                    console.error('Error setting up location tracking:', error);
                 }
-            } catch (error) {
-                console.error('Error fetching user role:', error);
-            } finally {
-                setIsLoading(false);
             }
         };
 
-        fetchUserRole();
-    }, [isLoaded, user?.id]);
+        if (userProfile) {
+            setupLocationTracking();
+        }
+    }, [userProfile]);
+
+    // Refresh function
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await fetchDashboardData();
+        setRefreshing(false);
+    }, [fetchDashboardData]);
+
+    // Initial data fetch
+    useEffect(() => {
+        fetchDashboardData();
+    }, [fetchDashboardData]);
 
     if (!isLoaded || isLoading) {
         return (
@@ -91,7 +285,9 @@ const Home = () => {
 
     // Role-based dashboard content
     const getRoleBasedContent = () => {
-        switch (userRole) {
+        if (!userProfile) return { title: 'Dashboard', subtitle: 'Welcome to LogisticQ', stats: [] };
+        
+        switch (userProfile.role) {
             case 'business':
                 return {
                     title: 'Business Dashboard',
@@ -99,31 +295,35 @@ const Home = () => {
                     stats: [
                         {
                             title: 'Active Shipments',
-                            value: '24',
+                            value: dashboardData?.activeShipments?.toString() || '0',
                             change: '+12%',
                             color: '#3B82F6',
-                            icon: <Package size={20} color="#3B82F6" />
+                            icon: <Package size={20} color="#3B82F6" />,
+                            onPress: () => router.push('/(root)/(tabs)/shipments')
                         },
                         {
-                            title: 'Total Cost Saved',
-                            value: '₹45,230',
+                            title: 'Total Shipments',
+                            value: dashboardData?.totalShipments?.toString() || '0',
                             change: '+8%',
                             color: '#10B981',
-                            icon: <DollarSign size={20} color="#10B981" />
+                            icon: <DollarSign size={20} color="#10B981" />,
+                            onPress: () => router.push('/(root)/(tabs)/analytics')
                         },
                         {
-                            title: 'Deliveries',
-                            value: '156',
+                            title: 'Delivered',
+                            value: dashboardData?.delivered?.toString() || '0',
                             change: '+15%',
                             color: '#8B5CF6',
-                            icon: <CheckCircle size={20} color="#8B5CF6" />
+                            icon: <CheckCircle size={20} color="#8B5CF6" />,
+                            onPress: () => router.push('/(root)/(tabs)/history')
                         },
                         {
-                            title: 'Analytics Score',
-                            value: '8.4',
+                            title: 'In Transit',
+                            value: dashboardData?.inTransit?.toString() || '0',
                             change: '+5%',
                             color: '#EF4444',
-                            icon: <BarChart3 size={20} color="#EF4444" />
+                            icon: <Navigation size={20} color="#EF4444" />,
+                            onPress: () => router.push('/(root)/(tabs)/tracking')
                         }
                     ]
                 };
@@ -134,31 +334,35 @@ const Home = () => {
                     stats: [
                         {
                             title: 'Active Jobs',
-                            value: '3',
+                            value: dashboardData?.activeJobs?.toString() || '0',
                             change: '+1',
                             color: '#10B981',
-                            icon: <Truck size={20} color="#10B981" />
+                            icon: <Truck size={20} color="#10B981" />,
+                            onPress: () => router.push('/(root)/(tabs)/jobs')
                         },
                         {
-                            title: 'Earnings Today',
-                            value: '₹2,450',
+                            title: 'Today Earnings',
+                            value: `₹${dashboardData?.todayEarnings?.toFixed(0) || '0'}`,
                             change: '+18%',
                             color: '#EF4444',
-                            icon: <DollarSign size={20} color="#EF4444" />
+                            icon: <DollarSign size={20} color="#EF4444" />,
+                            onPress: () => router.push('/(root)/(tabs)/earnings')
                         },
                         {
                             title: 'Rating',
-                            value: '4.8',
+                            value: dashboardData?.rating?.toString() || '0',
                             change: '+0.2',
                             color: '#FACC15',
-                            icon: <Star size={20} color="#FACC15" />
+                            icon: <Star size={20} color="#FACC15" />,
+                            onPress: () => router.push('/(root)/(tabs)/ratings')
                         },
                         {
-                            title: 'Deliveries',
-                            value: '89',
+                            title: 'Total Deliveries',
+                            value: dashboardData?.totalDeliveries?.toString() || '0',
                             change: '+12',
                             color: '#8B5CF6',
-                            icon: <Package size={20} color="#8B5CF6" />
+                            icon: <Package size={20} color="#8B5CF6" />,
+                            onPress: () => router.push('/(root)/(tabs)/history')
                         }
                     ]
                 };
@@ -168,32 +372,36 @@ const Home = () => {
                     subtitle: 'Track your incoming shipments',
                     stats: [
                         {
-                            title: 'Incoming Orders',
-                            value: '5',
+                            title: 'Active Orders',
+                            value: dashboardData?.activeShipments?.toString() || '0',
                             change: '+2',
                             color: '#8B5CF6',
-                            icon: <Package size={20} color="#8B5CF6" />
+                            icon: <Package size={20} color="#8B5CF6" />,
+                            onPress: () => router.push('/(root)/(tabs)/orders')
                         },
                         {
                             title: 'In Transit',
-                            value: '3',
+                            value: dashboardData?.inTransit?.toString() || '0',
                             change: '+1',
                             color: '#3B82F6',
-                            icon: <Navigation size={20} color="#3B82F6" />
+                            icon: <Navigation size={20} color="#3B82F6" />,
+                            onPress: () => router.push('/(root)/(tabs)/tracking')
                         },
                         {
                             title: 'Delivered',
-                            value: '47',
+                            value: dashboardData?.delivered?.toString() || '0',
                             change: '+8',
                             color: '#10B981',
-                            icon: <CheckCircle size={20} color="#10B981" />
+                            icon: <CheckCircle size={20} color="#10B981" />,
+                            onPress: () => router.push('/(root)/(tabs)/history')
                         },
                         {
                             title: 'Issues',
-                            value: '0',
+                            value: dashboardData?.issues?.toString() || '0',
                             change: '0',
                             color: '#EF4444',
-                            icon: <AlertCircle size={20} color="#EF4444" />
+                            icon: <AlertCircle size={20} color="#EF4444" />,
+                            onPress: () => router.push('/(root)/(tabs)/disputes')
                         }
                     ]
                 };
@@ -204,31 +412,35 @@ const Home = () => {
                     stats: [
                         {
                             title: 'Total Users',
-                            value: '1,234',
+                            value: dashboardData?.totalUsers?.toString() || '0',
                             change: '+56',
                             color: '#3B82F6',
-                            icon: <Users size={20} color="#3B82F6" />
+                            icon: <Users size={20} color="#3B82F6" />,
+                            onPress: () => router.push('/(root)/(tabs)/users')
                         },
                         {
                             title: 'Active Shipments',
-                            value: '890',
+                            value: dashboardData?.activeShipments?.toString() || '0',
                             change: '+123',
                             color: '#10B981',
-                            icon: <Package size={20} color="#10B981" />
+                            icon: <Package size={20} color="#10B981" />,
+                            onPress: () => router.push('/(root)/(tabs)/shipments')
                         },
                         {
                             title: 'Revenue',
-                            value: '₹5.6L',
+                            value: `₹${(dashboardData?.totalRevenue / 100000).toFixed(1)}L` || '₹0',
                             change: '+23%',
                             color: '#FACC15',
-                            icon: <DollarSign size={20} color="#FACC15" />
+                            icon: <DollarSign size={20} color="#FACC15" />,
+                            onPress: () => router.push('/(root)/(tabs)/analytics')
                         },
                         {
                             title: 'Disputes',
-                            value: '12',
+                            value: dashboardData?.disputes?.toString() || '0',
                             change: '-3',
                             color: '#EF4444',
-                            icon: <AlertCircle size={20} color="#EF4444" />
+                            icon: <AlertCircle size={20} color="#EF4444" />,
+                            onPress: () => router.push('/(root)/(tabs)/disputes')
                         }
                     ]
                 };
@@ -272,7 +484,12 @@ const Home = () => {
     ];
 
     const renderStatCard = (stat: StatCard, index: number) => (
-        <TouchableOpacity key={index} style={styles.statCard}>
+        <TouchableOpacity 
+            key={index} 
+            style={styles.statCard}
+            onPress={stat.onPress}
+            activeOpacity={0.7}
+        >
             <View style={styles.statHeader}>
                 <View style={styles.statIconContainer}>
                     {stat.icon}
@@ -305,18 +522,109 @@ const Home = () => {
         </TouchableOpacity>
     );
 
+    const getQuickActions = () => {
+        if (!userProfile) return [];
+        
+        switch (userProfile.role) {
+            case 'transporter':
+                return [
+                    {
+                        icon: <Map size={20} color="#FFFFFF" />,
+                        text: 'View Jobs',
+                        onPress: () => router.push('/(root)/(tabs)/jobs'),
+                        primary: true
+                    },
+                    {
+                        icon: <MapPin size={20} color="#007AFF" />,
+                        text: 'Go Online',
+                        onPress: async () => {
+                            try {
+                                await fetchAPI('/user/transporter-profile', {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        userId: userProfile.id,
+                                        is_available: true
+                                    })
+                                });
+                                Alert.alert('Success', 'You are now online and available for jobs!');
+                            } catch (error) {
+                                Alert.alert('Error', 'Failed to update availability');
+                            }
+                        },
+                        primary: false
+                    }
+                ];
+            case 'business':
+            case 'customer':
+                return [
+                    {
+                        icon: <Plus size={20} color="#FFFFFF" />,
+                        text: 'Create Shipment',
+                        onPress: () => router.push('/(root)/(tabs)/create-shipment'),
+                        primary: true
+                    },
+                    {
+                        icon: <Navigation size={20} color="#007AFF" />,
+                        text: 'Track Shipment',
+                        onPress: () => router.push('/(root)/(tabs)/tracking'),
+                        primary: false
+                    }
+                ];
+            case 'admin':
+                return [
+                    {
+                        icon: <Users size={20} color="#FFFFFF" />,
+                        text: 'Manage Users',
+                        onPress: () => router.push('/(root)/(tabs)/users'),
+                        primary: true
+                    },
+                    {
+                        icon: <BarChart3 size={20} color="#007AFF" />,
+                        text: 'Analytics',
+                        onPress: () => router.push('/(root)/(tabs)/analytics'),
+                        primary: false
+                    }
+                ];
+            default:
+                return [];
+        }
+    };
+
+    const quickActions = getQuickActions();
+
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                style={styles.scrollView} 
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#FACC15']}
+                        tintColor="#FACC15"
+                    />
+                }
+            >
                 {/* Header */}
                 <View style={styles.header}>
                     <View>
-                        <Text style={styles.greeting}>Good morning</Text>
+                        <Text style={styles.greeting}>
+                            {new Date().getHours() < 12 ? 'Good morning' : 
+                             new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'}
+                        </Text>
                         <Text style={styles.userName}>
-                            {user?.firstName || 'User'}! 👋
+                            {userProfile?.name || user?.firstName || 'User'}! 👋
                         </Text>
                     </View>
-                    <TouchableOpacity style={styles.notificationButton}>
+                    <TouchableOpacity 
+                        style={styles.notificationButton}
+                        onPress={() => {
+                            // Handle notifications
+                            Alert.alert('Notifications', 'No new notifications');
+                        }}
+                    >
                         <Bell size={24} color="#007AFF" />
                         <View style={styles.notificationBadge}>
                             <Text style={styles.badgeText}>3</Text>
@@ -330,23 +638,46 @@ const Home = () => {
                     <Text style={styles.roleSubtitle}>{roleContent.subtitle}</Text>
                 </View>
 
+                {/* Location Status for Transporters */}
+                {userProfile?.role === 'transporter' && location && (
+                    <View style={styles.locationStatus}>
+                        <MapPin size={16} color="#10B981" />
+                        <Text style={styles.locationText}>
+                            Location tracking active • {location.coords.latitude.toFixed(4)}, {location.coords.longitude.toFixed(4)}
+                        </Text>
+                    </View>
+                )}
+
                 {/* Quick Actions */}
-                <View style={styles.quickActions}>
-                    <TouchableOpacity style={styles.quickActionButton}>
-                        <Navigation size={20} color="#FFFFFF" />
-                        <Text style={styles.quickActionText}>Track Shipment</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.quickActionButton, styles.secondaryAction]}>
-                        <Package size={20} color="#007AFF" />
-                        <Text style={[styles.quickActionText, styles.secondaryActionText]}>New Order</Text>
-                    </TouchableOpacity>
-                </View>
+                {quickActions.length > 0 && (
+                    <View style={styles.quickActions}>
+                        {quickActions.map((action, index) => (
+                            <TouchableOpacity 
+                                key={index}
+                                style={[
+                                    styles.quickActionButton,
+                                    action.primary ? styles.primaryAction : styles.secondaryAction
+                                ]}
+                                onPress={action.onPress}
+                                activeOpacity={0.7}
+                            >
+                                {action.icon}
+                                <Text style={[
+                                    styles.quickActionText,
+                                    !action.primary && styles.secondaryActionText
+                                ]}>
+                                    {action.text}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
 
                 {/* Stats Grid */}
                 <View style={styles.statsContainer}>
                     <Text style={styles.sectionTitle}>Today's Overview</Text>
                     <View style={styles.statsGrid}>
-                        {stats.map(renderStatCard)}
+                        {roleContent.stats.map(renderStatCard)}
                     </View>
                 </View>
 
@@ -354,12 +685,19 @@ const Home = () => {
                 <View style={styles.activityContainer}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Recent Activity</Text>
-                        <TouchableOpacity>
+                        <TouchableOpacity onPress={() => router.push('/(root)/(tabs)/history')}>
                             <Text style={styles.seeAllText}>See All</Text>
                         </TouchableOpacity>
                     </View>
                     <View style={styles.activityList}>
-                        {recentActivity.map(renderActivityItem)}
+                        {recentActivities.length > 0 ? (
+                            recentActivities.map(renderActivityItem)
+                        ) : (
+                            <View style={styles.emptyState}>
+                                <Clock size={32} color="#8E8E93" />
+                                <Text style={styles.emptyStateText}>No recent activity</Text>
+                            </View>
+                        )}
                     </View>
                 </View>
 
@@ -592,6 +930,36 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#8E8E93',
         marginTop: 2,
+    },
+    locationStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F0FDF4',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        marginHorizontal: 20,
+        marginTop: 12,
+        borderRadius: 8,
+        borderLeftWidth: 3,
+        borderLeftColor: '#10B981',
+    },
+    locationText: {
+        fontSize: 12,
+        color: '#10B981',
+        marginLeft: 6,
+        fontWeight: '500',
+    },
+    primaryAction: {
+        backgroundColor: '#007AFF',
+    },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: 40,
+    },
+    emptyStateText: {
+        fontSize: 16,
+        color: '#8E8E93',
+        marginTop: 8,
     },
 });
 

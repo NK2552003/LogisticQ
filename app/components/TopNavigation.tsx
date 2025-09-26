@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -8,8 +8,10 @@ import {
     Pressable,
     Animated,
     Easing,
+    ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useUser } from '@clerk/clerk-expo';
 import {
     Menu,
     X,
@@ -17,7 +19,22 @@ import {
     Package,
     TimerReset,
     LocateIcon,
+    Truck,
+    BarChart3,
+    DollarSign,
+    Users,
+    CreditCard,
+    AlertTriangle,
+    Star,
+    Settings,
+    HelpCircle,
+    Phone,
+    FileText,
+    MapPin,
+    ShoppingCart,
+    Building,
 } from 'lucide-react-native';
+import { fetchAPI } from '../lib/fetch';
 
 interface TopNavigationProps {
     isVisible: boolean;
@@ -26,7 +43,15 @@ interface TopNavigationProps {
 
 const TopNavigation: React.FC<TopNavigationProps> = ({ isVisible, onClose }) => {
     const router = useRouter();
+    const { user } = useUser();
     const [animation] = useState(new Animated.Value(0));
+    const [userProfile, setUserProfile] = useState<any>(null);
+
+    useEffect(() => {
+        if (user?.id) {
+            fetchUserProfile();
+        }
+    }, [user?.id]);
 
     React.useEffect(() => {
         if (isVisible) {
@@ -46,6 +71,19 @@ const TopNavigation: React.FC<TopNavigationProps> = ({ isVisible, onClose }) => 
         }
     }, [isVisible]);
 
+    const fetchUserProfile = async () => {
+        if (!user?.id) return;
+
+        try {
+            const response = await fetchAPI(`/user?clerkUserId=${user.id}`);
+            if (response.user) {
+                setUserProfile(response.user);
+            }
+        } catch (error) {
+            console.error('Error fetching user profile:', error);
+        }
+    };
+
     const navigateToScreen = (screenName: string) => {
         onClose();
         // Small delay to allow modal to close smoothly
@@ -54,32 +92,174 @@ const TopNavigation: React.FC<TopNavigationProps> = ({ isVisible, onClose }) => 
         }, 200);
     };
 
-    const menuItems = [
-        {
-            name: 'Chat',
-            route: 'chat',
-            icon: MessageCircle,
-            description: 'Messages and conversations',
-        },
-        {
-            name: 'Orders',
-            route: 'orders',
-            icon: Package,
-            description: 'Manage your orders',
-        },
-        {
-            name: 'History',
-            route: 'history',
-            icon: TimerReset,
-            description: 'View past activities',
-        },
-        {
-            name: 'Tracking',
-            route: 'tracking',
-            icon: LocateIcon,
-            description: 'Track shipments',
-        },
-    ];
+    const getMenuItems = () => {
+        const commonItems = [
+            {
+                name: 'Chat',
+                route: 'chat',
+                icon: MessageCircle,
+                description: 'Messages & Support',
+                category: 'communication'
+            },
+            {
+                name: 'Tracking',
+                route: 'tracking',
+                icon: LocateIcon,
+                description: 'Track Shipments',
+                category: 'logistics'
+            },
+            {
+                name: 'History',
+                route: 'history',
+                icon: TimerReset,
+                description: 'Past Activities',
+                category: 'records'
+            },
+            {
+                name: 'Call Logs',
+                route: 'call-logs',
+                icon: Phone,
+                description: 'Call History',
+                category: 'communication'
+            },
+            {
+                name: 'Helpline',
+                route: 'helpline',
+                icon: HelpCircle,
+                description: 'Get Support',
+                category: 'support'
+            },
+            {
+                name: 'Settings',
+                route: 'settings',
+                icon: Settings,
+                description: 'App Settings',
+                category: 'account'
+            },
+        ];
+
+        const roleSpecificItems = [];
+
+        if (userProfile?.role === 'customer' || userProfile?.role === 'business') {
+            roleSpecificItems.push(
+                {
+                    name: 'Orders',
+                    route: 'orders',
+                    icon: ShoppingCart,
+                    description: 'My Orders',
+                    category: 'logistics'
+                },
+                {
+                    name: 'Shipments',
+                    route: 'shipments',
+                    icon: Package,
+                    description: 'My Shipments',
+                    category: 'logistics'
+                },
+                {
+                    name: 'Payments',
+                    route: 'payments',
+                    icon: CreditCard,
+                    description: 'Payment History',
+                    category: 'financial'
+                },
+                {
+                    name: 'Pricing',
+                    route: 'pricing',
+                    icon: DollarSign,
+                    description: 'Service Pricing',
+                    category: 'information'
+                },
+                {
+                    name: 'Ratings',
+                    route: 'ratings',
+                    icon: Star,
+                    description: 'Rate Services',
+                    category: 'feedback'
+                }
+            );
+        }
+
+        if (userProfile?.role === 'business') {
+            roleSpecificItems.push(
+                {
+                    name: 'Analytics',
+                    route: 'analytics',
+                    icon: BarChart3,
+                    description: 'Business Analytics',
+                    category: 'insights'
+                },
+                {
+                    name: 'Invoices',
+                    route: 'invoices',
+                    icon: FileText,
+                    description: 'Billing & Invoices',
+                    category: 'financial'
+                }
+            );
+        }
+
+        if (userProfile?.role === 'transporter') {
+            roleSpecificItems.push(
+                {
+                    name: 'Jobs',
+                    route: 'jobs',
+                    icon: Truck,
+                    description: 'Available Jobs',
+                    category: 'work'
+                },
+                {
+                    name: 'Earnings',
+                    route: 'earnings',
+                    icon: DollarSign,
+                    description: 'My Earnings',
+                    category: 'financial'
+                },
+                {
+                    name: 'Shipments',
+                    route: 'shipments',
+                    icon: Package,
+                    description: 'My Deliveries',
+                    category: 'work'
+                }
+            );
+        }
+
+        if (userProfile?.role === 'admin') {
+            roleSpecificItems.push(
+                {
+                    name: 'Users',
+                    route: 'users',
+                    icon: Users,
+                    description: 'User Management',
+                    category: 'admin'
+                },
+                {
+                    name: 'Analytics',
+                    route: 'analytics',
+                    icon: BarChart3,
+                    description: 'Platform Analytics',
+                    category: 'insights'
+                },
+                {
+                    name: 'Shipments',
+                    route: 'shipments',
+                    icon: Package,
+                    description: 'All Shipments',
+                    category: 'logistics'
+                },
+                {
+                    name: 'Disputes',
+                    route: 'disputes',
+                    icon: AlertTriangle,
+                    description: 'Handle Disputes',
+                    category: 'admin'
+                }
+            );
+        }
+
+        return [...roleSpecificItems, ...commonItems];
+    };
 
     const translateY = animation.interpolate({
         inputRange: [0, 1],
@@ -115,9 +295,9 @@ const TopNavigation: React.FC<TopNavigationProps> = ({ isVisible, onClose }) => 
                         </TouchableOpacity>
                     </View>
 
-                    <View style={styles.menuItems}>
+                    <ScrollView style={styles.menuItems} showsVerticalScrollIndicator={false}>
                         <View style={styles.gridContainer}>
-                            {menuItems.map((item, index) => (
+                            {getMenuItems().map((item, index) => (
                                 <TouchableOpacity
                                     key={item.route}
                                     style={styles.gridItem}
@@ -134,7 +314,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({ isVisible, onClose }) => 
                                 </TouchableOpacity>
                             ))}
                         </View>
-                    </View>
+                    </ScrollView>
                 </Animated.View>
             </Pressable>
         </Modal>
@@ -178,6 +358,7 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     menuItems: {
+        maxHeight: 400,
         padding: 12,
     },
     gridContainer: {
