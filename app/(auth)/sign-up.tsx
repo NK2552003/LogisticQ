@@ -142,7 +142,7 @@ const SignUp = () => {
         
         console.log('Clerk User ID:', signUpAttempt.createdUserId);
         await setActive({ session: signUpAttempt.createdSessionId });
-        router.replace('/'); // Navigate to your main app
+        router.replace('/(auth)/role-selection'); // Navigate to role selection
       } else {
         console.error(JSON.stringify(signUpAttempt, null, 2));
         Alert.alert("Error", "Verification failed. Please try again.");
@@ -193,8 +193,8 @@ const SignUp = () => {
           await googleSetActive({ session: createdSessionId });
         }
         
-        // Navigate to your main app screen
-        router.replace("/"); // Adjust this path based on your app structure
+        // Navigate to role selection screen
+        router.replace("/(auth)/role-selection");
       } else {
         // Handle sign-up or sign-in flow
         // This happens when the user needs to complete additional steps

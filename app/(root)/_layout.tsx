@@ -1,10 +1,15 @@
 import {Stack} from 'expo-router';
+
 const Layout = () => {
     return(
-        <Stack>
+        <Stack screenOptions={{headerShown: false}}>
             <Stack.Screen
-            name='(tabs)'
-            options={{headerShown: false}}
+                name='index'
+                options={{headerShown: false}}
+            />
+            <Stack.Screen
+                name='(tabs)'
+                options={{headerShown: false}}
             />
         </Stack>
     );

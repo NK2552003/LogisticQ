@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -7,8 +7,10 @@ import {
     TouchableOpacity,
     SafeAreaView,
     Dimensions,
+    ActivityIndicator,
 } from 'react-native';
 import { useUser } from "@clerk/clerk-expo";
+import { fetchAPI } from "../../lib/fetch";
 import { 
     Package, 
     Truck, 
@@ -19,7 +21,12 @@ import {
     CheckCircle,
     BarChart3,
     Navigation,
-    Bell
+    Bell,
+    Building2,
+    Users,
+    DollarSign,
+    Star,
+    Plus
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -42,38 +49,200 @@ interface RecentActivity {
 }
 
 const Home = () => {
-    const { user } = useUser();
+    const { user, isLoaded } = useUser();
+    const [userRole, setUserRole] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const stats: StatCard[] = [
-        {
-            title: 'Active Shipments',
-            value: '24',
-            change: '+12%',
-            color: '#007AFF',
-            icon: <Package size={24} color="#007AFF" />
-        },
-        {
-            title: 'Deliveries Today',
-            value: '18',
-            change: '+8%',
-            color: '#34C759',
-            icon: <Truck size={24} color="#34C759" />
-        },
-        {
-            title: 'On-Time Rate',
-            value: '94%',
-            change: '+2%',
-            color: '#FF9500',
-            icon: <Clock size={24} color="#FF9500" />
-        },
-        {
-            title: 'Revenue',
-            value: '$12.5K',
-            change: '+15%',
-            color: '#AF52DE',
-            icon: <TrendingUp size={24} color="#AF52DE" />
+    useEffect(() => {
+        const fetchUserRole = async () => {
+            if (!isLoaded || !user?.id) {
+                setIsLoading(false);
+                return;
+            }
+
+            try {
+                const response = await fetchAPI(`/user?clerkUserId=${user.id}`, {
+                    method: 'GET',
+                });
+
+                if (response.user) {
+                    setUserRole(response.user.role);
+                }
+            } catch (error) {
+                console.error('Error fetching user role:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchUserRole();
+    }, [isLoaded, user?.id]);
+
+    if (!isLoaded || isLoading) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#FACC15" />
+                    <Text style={styles.loadingText}>Loading...</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    // Role-based dashboard content
+    const getRoleBasedContent = () => {
+        switch (userRole) {
+            case 'business':
+                return {
+                    title: 'Business Dashboard',
+                    subtitle: 'Manage your shipments and logistics',
+                    stats: [
+                        {
+                            title: 'Active Shipments',
+                            value: '24',
+                            change: '+12%',
+                            color: '#3B82F6',
+                            icon: <Package size={20} color="#3B82F6" />
+                        },
+                        {
+                            title: 'Total Cost Saved',
+                            value: '₹45,230',
+                            change: '+8%',
+                            color: '#10B981',
+                            icon: <DollarSign size={20} color="#10B981" />
+                        },
+                        {
+                            title: 'Deliveries',
+                            value: '156',
+                            change: '+15%',
+                            color: '#8B5CF6',
+                            icon: <CheckCircle size={20} color="#8B5CF6" />
+                        },
+                        {
+                            title: 'Analytics Score',
+                            value: '8.4',
+                            change: '+5%',
+                            color: '#EF4444',
+                            icon: <BarChart3 size={20} color="#EF4444" />
+                        }
+                    ]
+                };
+            case 'transporter':
+                return {
+                    title: 'Transporter Dashboard',
+                    subtitle: 'Track your deliveries and earnings',
+                    stats: [
+                        {
+                            title: 'Active Jobs',
+                            value: '3',
+                            change: '+1',
+                            color: '#10B981',
+                            icon: <Truck size={20} color="#10B981" />
+                        },
+                        {
+                            title: 'Earnings Today',
+                            value: '₹2,450',
+                            change: '+18%',
+                            color: '#EF4444',
+                            icon: <DollarSign size={20} color="#EF4444" />
+                        },
+                        {
+                            title: 'Rating',
+                            value: '4.8',
+                            change: '+0.2',
+                            color: '#FACC15',
+                            icon: <Star size={20} color="#FACC15" />
+                        },
+                        {
+                            title: 'Deliveries',
+                            value: '89',
+                            change: '+12',
+                            color: '#8B5CF6',
+                            icon: <Package size={20} color="#8B5CF6" />
+                        }
+                    ]
+                };
+            case 'customer':
+                return {
+                    title: 'Customer Dashboard',
+                    subtitle: 'Track your incoming shipments',
+                    stats: [
+                        {
+                            title: 'Incoming Orders',
+                            value: '5',
+                            change: '+2',
+                            color: '#8B5CF6',
+                            icon: <Package size={20} color="#8B5CF6" />
+                        },
+                        {
+                            title: 'In Transit',
+                            value: '3',
+                            change: '+1',
+                            color: '#3B82F6',
+                            icon: <Navigation size={20} color="#3B82F6" />
+                        },
+                        {
+                            title: 'Delivered',
+                            value: '47',
+                            change: '+8',
+                            color: '#10B981',
+                            icon: <CheckCircle size={20} color="#10B981" />
+                        },
+                        {
+                            title: 'Issues',
+                            value: '0',
+                            change: '0',
+                            color: '#EF4444',
+                            icon: <AlertCircle size={20} color="#EF4444" />
+                        }
+                    ]
+                };
+            case 'admin':
+                return {
+                    title: 'Admin Dashboard',
+                    subtitle: 'Platform overview and management',
+                    stats: [
+                        {
+                            title: 'Total Users',
+                            value: '1,234',
+                            change: '+56',
+                            color: '#3B82F6',
+                            icon: <Users size={20} color="#3B82F6" />
+                        },
+                        {
+                            title: 'Active Shipments',
+                            value: '890',
+                            change: '+123',
+                            color: '#10B981',
+                            icon: <Package size={20} color="#10B981" />
+                        },
+                        {
+                            title: 'Revenue',
+                            value: '₹5.6L',
+                            change: '+23%',
+                            color: '#FACC15',
+                            icon: <DollarSign size={20} color="#FACC15" />
+                        },
+                        {
+                            title: 'Disputes',
+                            value: '12',
+                            change: '-3',
+                            color: '#EF4444',
+                            icon: <AlertCircle size={20} color="#EF4444" />
+                        }
+                    ]
+                };
+            default:
+                return {
+                    title: 'Dashboard',
+                    subtitle: 'Welcome to LogisticQ',
+                    stats: []
+                };
         }
-    ];
+    };
+
+    const roleContent = getRoleBasedContent();
+    const stats: StatCard[] = roleContent.stats;
 
     const recentActivity: RecentActivity[] = [
         {
@@ -153,6 +322,12 @@ const Home = () => {
                             <Text style={styles.badgeText}>3</Text>
                         </View>
                     </TouchableOpacity>
+                </View>
+
+                {/* Role-based Header */}
+                <View style={styles.roleHeader}>
+                    <Text style={styles.roleTitle}>{roleContent.title}</Text>
+                    <Text style={styles.roleSubtitle}>{roleContent.subtitle}</Text>
                 </View>
 
                 {/* Quick Actions */}
@@ -390,6 +565,33 @@ const styles = StyleSheet.create({
     },
     bottomPadding: {
         height: 100,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 16,
+        color: '#8E8E93',
+    },
+    roleHeader: {
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E5EA',
+    },
+    roleTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#000000',
+    },
+    roleSubtitle: {
+        fontSize: 14,
+        color: '#8E8E93',
+        marginTop: 2,
     },
 });
 

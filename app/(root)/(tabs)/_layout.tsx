@@ -7,7 +7,8 @@ import {
     MessageCircle,
     Package,
     TimerReset,
-    LocateIcon
+    LocateIcon,
+    Menu
 } from 'lucide-react-native';
 import { Platform, View } from 'react-native';
 
@@ -115,11 +116,42 @@ const Layout = () => {
                     ),
                 }}
             />
+
+            {/* More tab that opens top navigation */}
+            <Tabs.Screen 
+                name='more' 
+                options={{
+                    title: 'More',
+                    tabBarLabel: 'More',
+                    tabBarIcon: ({ color, size, focused }) => (
+                        <View style={{ position: 'relative' }}>
+                            <Menu 
+                                color={color} 
+                                size={focused ? 26 : 24}
+                                strokeWidth={focused ? 2.2 : 2}
+                            />
+                            {/* Small indicator badge */}
+                            <View style={{
+                                position: 'absolute',
+                                top: -2,
+                                right: -2,
+                                width: 8,
+                                height: 8,
+                                borderRadius: 4,
+                                backgroundColor: '#FF3B30',
+                            }} />
+                        </View>
+                    ),
+                }}
+            />
+
+            {/* Hidden tabs - accessible only through top navigation */}
             <Tabs.Screen
                 name='chat'
                 options={{
                     title:"Chat",
                     tabBarLabel: 'Chat',
+                    href: null, // Hide from tab bar
                     tabBarIcon: ({ color, size, focused }) => (
                         <MessageCircle
                             color={color}
@@ -128,12 +160,13 @@ const Layout = () => {
                         />
                     )
                 }}
-                />
-                       <Tabs.Screen
+            />
+            <Tabs.Screen
                 name='orders'
                 options={{
                     title:"Orders",
                     tabBarLabel: 'Orders',
+                    href: null, // Hide from tab bar
                     tabBarIcon: ({ color, size, focused }) => (
                         <Package
                             color={color}
@@ -142,12 +175,13 @@ const Layout = () => {
                         />
                     )
                 }}
-                />
-                <Tabs.Screen
+            />
+            <Tabs.Screen
                 name='history'
                 options={{
                     title:"History",
                     tabBarLabel: 'History',
+                    href: null, // Hide from tab bar
                     tabBarIcon: ({ color, size, focused }) => (
                         <TimerReset
                             color={color}
@@ -156,12 +190,13 @@ const Layout = () => {
                         />
                     )
                 }}
-                />
-                <Tabs.Screen
+            />
+            <Tabs.Screen
                 name='tracking'
                 options={{
                     title:"Tracking",
                     tabBarLabel: 'Tracking',
+                    href: null, // Hide from tab bar
                     tabBarIcon: ({ color, size, focused }) => (
                         <LocateIcon
                             color={color}
@@ -170,7 +205,25 @@ const Layout = () => {
                         />
                     )
                 }}
-                />
+            />
+
+            {/* Hide all other tabs from tab bar */}
+            <Tabs.Screen name='admin-tabs' options={{ href: null }} />
+            <Tabs.Screen name='analytics' options={{ href: null }} />
+            <Tabs.Screen name='business-tabs' options={{ href: null }} />
+            <Tabs.Screen name='create-shipment' options={{ href: null }} />
+            <Tabs.Screen name='customer-tabs' options={{ href: null }} />
+            <Tabs.Screen name='disputes' options={{ href: null }} />
+            <Tabs.Screen name='earnings' options={{ href: null }} />
+            <Tabs.Screen name='invoices' options={{ href: null }} />
+            <Tabs.Screen name='jobs' options={{ href: null }} />
+            <Tabs.Screen name='payments' options={{ href: null }} />
+            <Tabs.Screen name='pricing' options={{ href: null }} />
+            <Tabs.Screen name='ratings' options={{ href: null }} />
+            <Tabs.Screen name='settings' options={{ href: null }} />
+            <Tabs.Screen name='shipments' options={{ href: null }} />
+            <Tabs.Screen name='transporter-tabs' options={{ href: null }} />
+            <Tabs.Screen name='users' options={{ href: null }} />
         </Tabs>
     );
 };
