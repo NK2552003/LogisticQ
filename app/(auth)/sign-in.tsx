@@ -1,5 +1,5 @@
 // screens/Login.tsx
-import { useSignIn } from '@clerk/clerk-expo';
+import { useSignIn, useOAuth } from '@clerk/clerk-expo';
 import { router } from "expo-router";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react-native";
 import React, { useState } from "react";
@@ -21,11 +21,14 @@ import { SocialButton } from "../components/SocialButton";
 
 const Login = () => {
   const { signIn, setActive, isLoaded } = useSignIn();
+  const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" });
+  
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!isLoaded) return;
@@ -43,7 +46,7 @@ const Login = () => {
       // and redirect the user
       if (signInAttempt.status === 'complete') {
         await setActive({ session: signInAttempt.createdSessionId });
-        router.replace('/(root)/(tabs)/home'); // Navigate to your main app
+        router.replace('/'); // Navigate to your main app
       } else {
         // If the status isn't complete, check why. User might need to
         // complete further steps.
@@ -63,20 +66,39 @@ const Login = () => {
   };
 
   const handleGoogleLogin = async () => {
-    console.log("Google login pressed");
-    // Add Google OAuth logic here using Clerk
-    // You'll need to set up Google OAuth in your Clerk dashboard
-    // and implement the OAuth flow
+    setIsGoogleLoading(true);
+    
     try {
-      // Example implementation would go here
-      // const googleSignIn = await signIn.authenticateWithRedirect({
-      //   strategy: 'oauth_google',
-      //   redirectUrl: '/sso-callback',
-      //   redirectUrlComplete: '/(tabs)/home'
-      // });
-      Alert.alert('Coming Soon', 'Google sign-in will be implemented soon.');
-    } catch (error) {
-      console.error('Google sign-in error:', error);
+      const { createdSessionId, signIn: googleSignIn, signUp, setActive: googleSetActive } = await startOAuthFlow();
+
+      if (createdSessionId) {
+        // User signed in successfully with Google
+        if (typeof googleSetActive === "function") {
+          await googleSetActive({ session: createdSessionId });
+        }
+        
+        // Navigate to your main app screen
+        router.replace("/"); // Adjust this path based on your app structure
+      } else {
+        // Handle sign-up or sign-in flow
+        // This happens when the user needs to complete additional steps
+        console.log("Additional steps required for Google sign-in");
+        Alert.alert(
+          'Sign In', 
+          'Please complete the additional steps required to finish signing in with Google.'
+        );
+      }
+    } catch (err: any) {
+      console.error("Google OAuth error", err);
+      
+      // Show user-friendly error message
+      const errorMessage = err.errors?.[0]?.message || 'Failed to sign in with Google';
+      Alert.alert(
+        "Google Sign In Error", 
+        `${errorMessage}. Please try again.`
+      );
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
@@ -146,7 +168,7 @@ const Login = () => {
             title="Login"
             onPress={handleLogin}
             loading={isLoading}
-            disabled={!email || !password || !isLoaded}
+            disabled={!email || !password || !isLoaded || isGoogleLoading}
           />
 
           {/* Or Login With */}
@@ -154,9 +176,12 @@ const Login = () => {
             <Text className="text-gray-500 mb-6">Or Login with</Text>
             
             <SocialButton
-              title="Google"
+              title="Continue with Google"
               onPress={handleGoogleLogin}
               icon={<GoogleIcon />}
+              backgroundColor="bg-white"
+              textColor="text-gray-700"
+              borderColor="border-gray-200"
             />
           </View>
 

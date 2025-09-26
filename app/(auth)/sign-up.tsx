@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { Eye, EyeOff, Lock, Mail, User } from "lucide-react-native";
 import React, { useState } from "react";
 import { Alert, SafeAreaView, StatusBar, Text, TouchableOpacity, View } from "react-native";
-import { useSignUp } from '@clerk/clerk-expo';
+import { useSignUp, useOAuth } from '@clerk/clerk-expo';
 import { AuthFooter } from "../components/AuthFooter";
 import { CustomCheckbox } from "../components/CustomCheckbox";
 import { FormInput } from "../components/FormInput";
@@ -13,6 +13,7 @@ import { SocialButton } from "../components/SocialButton";
 
 const SignUp = () => {
   const { isLoaded, signUp, setActive } = useSignUp();
+  const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" });
   
   const [fullName, setFullName] = useState<string>("");
   const [email, setEmail] = useState<string>("");
@@ -24,6 +25,7 @@ const SignUp = () => {
   const [pendingVerification, setPendingVerification] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   // Validate form inputs
   const validateForm = () => {
@@ -103,7 +105,7 @@ const SignUp = () => {
 
       if (signUpAttempt.status === 'complete') {
         await setActive({ session: signUpAttempt.createdSessionId });
-        router.replace('/');
+        router.replace('/'); // Navigate to your main app
       } else {
         console.error(JSON.stringify(signUpAttempt, null, 2));
         Alert.alert("Error", "Verification failed. Please try again.");
@@ -132,6 +134,44 @@ const SignUp = () => {
     }
   };
 
+  // Handle Google Sign Up
+  const handleGoogleSignUp = async () => {
+    setIsGoogleLoading(true);
+    
+    try {
+      const { createdSessionId, signIn, signUp: googleSignUp, setActive: googleSetActive } = await startOAuthFlow();
+
+      if (createdSessionId) {
+        // User signed up/in successfully with Google
+        if (typeof googleSetActive === "function") {
+          await googleSetActive({ session: createdSessionId });
+        }
+        
+        // Navigate to your main app screen
+        router.replace("/"); // Adjust this path based on your app structure
+      } else {
+        // Handle sign-up or sign-in flow
+        // This happens when the user needs to complete additional steps
+        console.log("Additional steps required for Google sign-up");
+        Alert.alert(
+          'Sign Up', 
+          'Please complete the additional steps required to finish signing up with Google.'
+        );
+      }
+    } catch (err: any) {
+      console.error("Google OAuth error", err);
+      
+      // Show user-friendly error message
+      const errorMessage = err.errors?.[0]?.message || 'Failed to sign up with Google';
+      Alert.alert(
+        "Google Sign Up Error", 
+        `${errorMessage}. Please try again.`
+      );
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
   // If pending verification, show verification screen
   if (pendingVerification) {
     return (
@@ -155,12 +195,14 @@ const SignUp = () => {
               onChangeText={setVerificationCode}
               placeholder="Enter verification code"
               icon={Mail}
+              keyboardType="numeric"
             />
 
             <PrimaryButton
               title={isLoading ? "Verifying..." : "Verify Email"}
               onPress={onVerifyPress}
-              disabled={isLoading}
+              disabled={isLoading || !verificationCode.trim()}
+              loading={isLoading}
             />
 
             <View className="items-center w-full">
@@ -190,7 +232,7 @@ const SignUp = () => {
       
       <View className="flex-1 px-6 mt-8 top-28 relative">
         <Text className="text-3xl font-bold text-gray-900 text-center mb-12">
-          Create an Account?
+          Create an Account
         </Text>
 
         <View className="space-y-6 gap-6">
@@ -217,7 +259,7 @@ const SignUp = () => {
             onChangeText={setPassword}
             placeholder="Enter your password"
             icon={Lock}
-            secureTextEntry
+            secureTextEntry={!showPassword}
             showSecureText={showPassword}
             onToggleSecureText={() => setShowPassword(!showPassword)}
             rightIcon={showPassword ? EyeOff : Eye}
@@ -229,7 +271,7 @@ const SignUp = () => {
             onChangeText={setConfirmPassword}
             placeholder="Confirm your password"
             icon={Lock}
-            secureTextEntry
+            secureTextEntry={!showConfirmPassword}
             showSecureText={showConfirmPassword}
             onToggleSecureText={() => setShowConfirmPassword(!showConfirmPassword)}
             rightIcon={showConfirmPassword ? EyeOff : Eye}
@@ -244,18 +286,19 @@ const SignUp = () => {
           <PrimaryButton
             title={isLoading ? "Creating Account..." : "Sign Up"}
             onPress={onSignUpPress}
-            disabled={isLoading}
+            disabled={isLoading || isGoogleLoading || !fullName.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()}
+            loading={isLoading}
           />
 
           <View className="items-center">
-            <Text className="text-gray-500 mb-6">Or Login with</Text>
+            <Text className="text-gray-500 mb-6">Or Sign Up with</Text>
             <SocialButton
-              title="Google"
-              onPress={() => {
-                // TODO: Implement Google OAuth with Clerk
-                Alert.alert("Coming Soon", "Google sign-in will be available soon");
-              }}
+              title="Continue with Google"
+              onPress={handleGoogleSignUp}
               icon={<GoogleIcon />}
+              backgroundColor="bg-white"
+              textColor="text-gray-700"
+              borderColor="border-gray-200"
             />
           </View>
 
