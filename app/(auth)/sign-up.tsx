@@ -10,6 +10,7 @@ import { GoogleIcon } from "../components/GoogleIcon";
 import Header from "../components/Header";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { SocialButton } from "../components/SocialButton";
+import { fetchAPI } from "../lib/fetch";
 
 const SignUp = () => {
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -27,6 +28,7 @@ const SignUp = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
+  
   // Validate form inputs
   const validateForm = () => {
     if (!fullName.trim()) {
@@ -104,6 +106,41 @@ const SignUp = () => {
       });
 
       if (signUpAttempt.status === 'complete') {
+        try {
+          console.log('Attempting to save user to database...');
+          console.log('API call data:', {
+            email,
+            firstName: fullName.split(' ')[0] || '',
+            lastName: fullName.split(' ').slice(1).join(' ') || '',
+            clerkUserId: signUpAttempt.createdUserId || '',
+          });
+          
+          const userResponse = await fetchAPI('/user', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email,
+              firstName: fullName.split(' ')[0] || '',
+              password,
+              lastName: fullName.split(' ').slice(1).join(' ') || '',
+              clerkUserId: signUpAttempt.createdUserId || '',
+            })
+          });
+          console.log('✅ User created successfully in database:', userResponse);
+        } catch (userError) {
+          console.error('❌ Error creating user in database:', userError);
+          console.error('Error details:', JSON.stringify(userError, null, 2));
+          
+          // Continue with sign-in even if user creation fails
+          Alert.alert(
+            "Warning", 
+            `Account created successfully, but there was an issue saving user data: ${userError instanceof Error ? userError.message : 'Unknown error'}. You can still continue.`
+          );
+        }
+        
+        console.log('Clerk User ID:', signUpAttempt.createdUserId);
         await setActive({ session: signUpAttempt.createdSessionId });
         router.replace('/'); // Navigate to your main app
       } else {
@@ -111,11 +148,20 @@ const SignUp = () => {
         Alert.alert("Error", "Verification failed. Please try again.");
       }
     } catch (err: any) {
-      console.error(JSON.stringify(err, null, 2));
-      Alert.alert(
-        "Verification Error", 
-        err.errors?.[0]?.message || "An error occurred during verification"
-      );
+      console.error('Verification error details:', err);
+      
+      let errorMessage = "An error occurred during verification";
+      
+      // Handle Clerk-specific errors
+      if (err.errors && err.errors.length > 0) {
+        errorMessage = err.errors[0].message;
+      } 
+      // Handle fetch/network errors
+      else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      Alert.alert("Verification Error", errorMessage);
     } finally {
       setIsLoading(false);
     }
