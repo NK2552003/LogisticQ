@@ -1,3 +1,179 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom Base Styles */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+}
+
+/* Custom Component Styles */
+@layer components {
+  /* Modern Card */
+  .modern-card {
+    @apply bg-white rounded-2xl shadow-lg border border-slate-100;
+  }
+  
+  .modern-card-elevated {
+    @apply bg-white rounded-2xl shadow-xl border border-slate-100;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    @apply bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold shadow-md active:scale-95 transition-all;
+  }
+  
+  .btn-secondary {
+    @apply bg-slate-100 text-slate-700 px-6 py-3 rounded-xl font-semibold border border-slate-200 active:scale-95 transition-all;
+  }
+
+  /* Input Fields */
+  .input-modern {
+    @apply bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:bg-white transition-all;
+  }
+
+  /* Typography */
+  .text-heading {
+    @apply text-2xl font-bold text-slate-900;
+  }
+  
+  .text-subheading {
+    @apply text-lg font-semibold text-slate-700;
+  }
+  
+  .text-body {
+    @apply text-base text-slate-600;
+  }
+  
+  .text-caption {
+    @apply text-sm text-slate-500;
+  }
+
+  /* Status Indicators */
+  .status-active {
+    @apply bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-medium;
+  }
+  
+  .status-pending {
+    @apply bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-medium;
+  }
+  
+  .status-completed {
+    @apply bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-medium;
+  }
+  
+  .status-error {
+    @apply bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium;
+  }
+
+  /* Layout Utilities */
+  .container-responsive {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+  
+  .grid-responsive {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4;
+  }
+  
+  .flex-center {
+    @apply flex items-center justify-center;
+  }
+  
+  .flex-between {
+    @apply flex items-center justify-between;
+  }
+
+  /* Animation Utilities */
+  .animate-fade-in {
+    @apply animate-pulse;
+  }
+  
+  .animate-slide-up {
+    @apply transform transition-transform duration-300 ease-out;
+  }
+
+  /* Mobile-first responsive containers */
+  .mobile-container {
+    @apply px-4 py-2;
+  }
+  
+  .tablet-container {
+    @apply sm:px-6 sm:py-4;
+  }
+  
+  .desktop-container {
+    @apply lg:px-8 lg:py-6;
+  }
+}
+
+/* Custom Utility Classes */
+@layer utilities {
+  /* Glassmorphism effect */
+  .glass {
+    backdrop-filter: blur(10px);
+    background-color: rgba(255, 255, 255, 0.8);
+  }
+  
+  .glass-dark {
+    backdrop-filter: blur(10px);
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+
+  /* Gradient backgrounds */
+  .gradient-primary {
+    background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+  }
+  
+  .gradient-secondary {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  }
+  
+  .gradient-accent {
+    background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+  }
+
+  /* Shadow utilities */
+  .shadow-soft {
+    box-shadow: 0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04);
+  }
+  
+  .shadow-medium {
+    box-shadow: 0 4px 25px -4px rgba(0, 0, 0, 0.1), 0 20px 25px -5px rgba(0, 0, 0, 0.06);
+  }
+  
+  .shadow-strong {
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15), 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Interactive states */
+  .interactive {
+    @apply transition-all duration-200 ease-out;
+  }
+  
+  .interactive:hover {
+    @apply scale-105;
+  }
+  
+  .interactive:active {
+    @apply scale-95;
+  }
+
+  /* Safe area handling for mobile */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
+}

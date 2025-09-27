@@ -5,7 +5,7 @@ import { TouchableOpacity } from "react-native";
 
 interface BackButtonProps {
   onPress?: () => void;
-  route?: string;
+  route?: any;
   backgroundColor?: string;
   borderColor?: string;
   iconColor?: string;
@@ -39,3 +39,5 @@ export const BackButton: React.FC<BackButtonProps> = ({
     </TouchableOpacity>
   );
 };
+
+export default BackButton;

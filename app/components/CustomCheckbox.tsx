@@ -36,3 +36,5 @@ export const CustomCheckbox: React.FC<CustomCheckboxProps> = ({
     </View>
   );
 };
+
+export default CustomCheckbox;

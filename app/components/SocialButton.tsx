@@ -28,3 +28,5 @@ export const SocialButton: React.FC<SocialButtonProps> = ({
     </TouchableOpacity>
   );
 };
+
+export default SocialButton;

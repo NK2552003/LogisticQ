@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
     View,
     Text,
-    StyleSheet,
     ScrollView,
     TouchableOpacity,
     SafeAreaView,
@@ -10,11 +9,13 @@ import {
     ActivityIndicator,
     RefreshControl,
     Alert,
+    Image,
 } from 'react-native';
 import { useUser } from "@clerk/clerk-expo";
 import { useRouter } from 'expo-router';
 import { fetchAPI } from "../../lib/fetch";
 import * as Location from 'expo-location';
+import EnhancedMapView from '../../components/EnhancedMapView';
 import { 
     Package, 
     Truck, 
@@ -33,7 +34,8 @@ import {
     Plus,
     Map,
     Calendar,
-    Settings
+    Settings,
+    Search
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -82,7 +84,10 @@ const Home = () => {
             setIsLoading(true);
             
             // Get user profile
+
+            console.log('Fetching user profile for user ID:', user.id);
             const userResponse = await fetchAPI(`/user?clerkUserId=${user.id}`);
+            console.log('Fetched user profile:', userResponse)
             if (userResponse.user) {
                 setUserProfile(userResponse.user);
                 
@@ -95,7 +100,6 @@ const Home = () => {
             setIsLoading(false);
         }
     }, [isLoaded, user?.id]);
-
     const fetchRoleSpecificData = async (profile: UserProfile) => {
         try {
             const role = profile.role;
@@ -274,10 +278,10 @@ const Home = () => {
 
     if (!isLoaded || isLoading) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.loadingContainer}>
+            <SafeAreaView className="flex-1 bg-slate-50">
+                <View className="flex-1 justify-center items-center">
                     <ActivityIndicator size="large" color="#FACC15" />
-                    <Text style={styles.loadingText}>Loading...</Text>
+                    <Text className="mt-4 text-base text-slate-500 font-medium">Loading...</Text>
                 </View>
             </SafeAreaView>
         );
@@ -486,18 +490,15 @@ const Home = () => {
     const renderStatCard = (stat: StatCard, index: number) => (
         <TouchableOpacity 
             key={index} 
-            style={styles.statCard}
+            className="flex-1 bg-slate-50 p-3 rounded-xl items-center border border-gray-200 min-h-[100px]"
             onPress={stat.onPress}
             activeOpacity={0.7}
         >
-            <View style={styles.statHeader}>
-                <View style={styles.statIconContainer}>
-                    {stat.icon}
-                </View>
-                <Text style={styles.statChange}>{stat.change}</Text>
+            <View className="w-8 h-8 rounded-2xl justify-center items-center mb-2" style={{ backgroundColor: stat.color + '20' }}>
+                {stat.icon}
             </View>
-            <Text style={styles.statValue}>{stat.value}</Text>
-            <Text style={styles.statTitle}>{stat.title}</Text>
+            <Text className="text-lg font-bold text-gray-900 mb-0.5">{stat.value}</Text>
+            <Text className="text-xs text-gray-500 font-semibold text-center leading-3">{stat.title}</Text>
         </TouchableOpacity>
     );
 
@@ -510,15 +511,15 @@ const Home = () => {
     };
 
     const renderActivityItem = (item: RecentActivity) => (
-        <TouchableOpacity key={item.id} style={styles.activityItem}>
-            <View style={styles.activityIcon}>
+        <TouchableOpacity key={item.id} className="flex-row items-center py-4 px-1 border-b border-slate-100">
+            <View className="w-11 h-11 bg-slate-50 rounded-full justify-center items-center mr-4 border border-gray-200">
                 {getActivityIcon(item.type, item.status)}
             </View>
-            <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>{item.title}</Text>
-                <Text style={styles.activitySubtitle}>{item.subtitle}</Text>
+            <View className="flex-1">
+                <Text className="text-base font-semibold text-gray-900 mb-1">{item.title}</Text>
+                <Text className="text-sm text-gray-500 leading-5">{item.subtitle}</Text>
             </View>
-            <Text style={styles.activityTime}>{item.time}</Text>
+            <Text className="text-xs text-gray-400 font-medium">{item.time}</Text>
         </TouchableOpacity>
     );
 
@@ -594,373 +595,187 @@ const Home = () => {
     const quickActions = getQuickActions();
 
     return (
-        <SafeAreaView style={styles.container}>
-            <ScrollView 
-                style={styles.scrollView} 
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        colors={['#FACC15']}
-                        tintColor="#FACC15"
-                    />
-                }
-            >
-                {/* Header */}
-                <View style={styles.header}>
-                    <View>
-                        <Text style={styles.greeting}>
+        <View className="flex-1 bg-black">
+            {/* Large Map Background - Uber Style */}
+            <View className="absolute top-0 left-0 right-0 bottom-0 z-[1]">
+                <EnhancedMapView
+                    latitude={location?.coords.latitude || 37.7749}
+                    longitude={location?.coords.longitude || -122.4194}
+                    markers={[
+                        {
+                            id: '1',
+                            latitude: (location?.coords.latitude || 37.7749) + 0.01,
+                            longitude: (location?.coords.longitude || -122.4194) + 0.01,
+                            title: 'Active Delivery',
+                            status: 'active'
+                        },
+                        {
+                            id: '2',
+                            latitude: (location?.coords.latitude || 37.7749) - 0.005,
+                            longitude: (location?.coords.longitude || -122.4194) + 0.015,
+                            title: 'Pending Pickup',
+                            status: 'pending'
+                        },
+                        {
+                            id: '3',
+                            latitude: (location?.coords.latitude || 37.7749) + 0.008,
+                            longitude: (location?.coords.longitude || -122.4194) - 0.012,
+                            title: 'Completed',
+                            status: 'completed'
+                        }
+                    ]}
+                    height={Dimensions.get('window').height}
+                    showControls={true}
+                    zoom={16}
+                    onMapReady={() => console.log('Enhanced map is ready!')}
+                />
+            </View>
+
+            {/* Top Header Overlay */}
+            <SafeAreaView className="absolute top-10 left-0 right-0 z-10 bg-transparent">
+                <View className="flex-row items-center justify-between px-4 py-3 bg-white/95 mx-4 mt-2 rounded-2xl shadow-lg shadow-black/15 backdrop-blur-xl">
+                    <TouchableOpacity className="w-10 h-10 rounded-full overflow-hidden">
+                        <Image 
+                            source={{ uri: user?.imageUrl || 'https://via.placeholder.com/40' }}
+                            className="w-full h-full rounded-full"
+                            defaultSource={{ uri: 'https://via.placeholder.com/40' }}
+                        />
+                    </TouchableOpacity>
+                    
+                    <View className="flex-1 items-center mx-4">
+                        <Text className="text-sm text-gray-500 font-medium">
                             {new Date().getHours() < 12 ? 'Good morning' : 
                              new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'}
                         </Text>
-                        <Text style={styles.userName}>
-                            {userProfile?.name || user?.firstName || 'User'}! 👋
+                        <Text className="text-lg font-bold text-gray-900 mt-0.5">
+                            {userProfile?.name || user?.firstName || 'User'}
                         </Text>
                     </View>
+                    
                     <TouchableOpacity 
-                        style={styles.notificationButton}
-                        onPress={() => {
-                            // Handle notifications
-                            Alert.alert('Notifications', 'No new notifications');
-                        }}
+                        className="relative w-10 h-10 rounded-full bg-black/5 justify-center items-center"
+                        onPress={() => Alert.alert('Notifications', 'No new notifications')}
                     >
-                        <Bell size={24} color="#007AFF" />
-                        <View style={styles.notificationBadge}>
-                            <Text style={styles.badgeText}>3</Text>
+                        <Bell size={24} color="#000000" />
+                        <View className="absolute top-1.5 right-1.5 bg-red-500 rounded-lg w-4 h-4 justify-center items-center">
+                            <Text className="text-white text-xs font-bold">3</Text>
                         </View>
                     </TouchableOpacity>
                 </View>
+            </SafeAreaView>
 
-                {/* Role-based Header */}
-                <View style={styles.roleHeader}>
-                    <Text style={styles.roleTitle}>{roleContent.title}</Text>
-                    <Text style={styles.roleSubtitle}>{roleContent.subtitle}</Text>
-                </View>
-
-                {/* Location Status for Transporters */}
-                {userProfile?.role === 'transporter' && location && (
-                    <View style={styles.locationStatus}>
-                        <MapPin size={16} color="#10B981" />
-                        <Text style={styles.locationText}>
-                            Location tracking active • {location.coords.latitude.toFixed(4)}, {location.coords.longitude.toFixed(4)}
-                        </Text>
-                    </View>
-                )}
-
-                {/* Quick Actions */}
-                {quickActions.length > 0 && (
-                    <View style={styles.quickActions}>
-                        {quickActions.map((action, index) => (
-                            <TouchableOpacity 
-                                key={index}
-                                style={[
-                                    styles.quickActionButton,
-                                    action.primary ? styles.primaryAction : styles.secondaryAction
-                                ]}
-                                onPress={action.onPress}
-                                activeOpacity={0.7}
-                            >
-                                {action.icon}
-                                <Text style={[
-                                    styles.quickActionText,
-                                    !action.primary && styles.secondaryActionText
-                                ]}>
-                                    {action.text}
+            {/* Bottom Cards Overlay - Above Navbar */}
+            <View className="absolute left-0 right-0 bottom-0 z-[5] bg-transparent" style={{top: Dimensions.get('window').height * 0.63}}>
+                <ScrollView 
+                    className="flex-1 pt-4"
+                    showsVerticalScrollIndicator={false}
+                    bounces={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            colors={['#3B82F6']}
+                            tintColor="#3B82F6"
+                        />
+                    }
+                >
+                    {/* Location Status for Transporters */}
+                    {userProfile?.role === 'transporter' && location && (
+                        <View className="flex-row items-center bg-emerald-500/95 mx-4 mb-3 p-4 rounded-2xl shadow-sm shadow-black/10 backdrop-blur-xl">
+                            <View className="w-3 h-3 rounded-full bg-white mr-3 shadow-emerald-500 shadow-lg" />
+                            <View className="flex-1">
+                                <Text className="text-base font-semibold text-white mb-0.5">You're online</Text>
+                                <Text className="text-xs text-white/80 font-medium">
+                                    {location.coords.latitude.toFixed(4)}, {location.coords.longitude.toFixed(4)}
                                 </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                )}
-
-                {/* Stats Grid */}
-                <View style={styles.statsContainer}>
-                    <Text style={styles.sectionTitle}>Today's Overview</Text>
-                    <View style={styles.statsGrid}>
-                        {roleContent.stats.map(renderStatCard)}
-                    </View>
-                </View>
-
-                {/* Recent Activity */}
-                <View style={styles.activityContainer}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Recent Activity</Text>
-                        <TouchableOpacity onPress={() => router.push('/(root)/(tabs)/history')}>
-                            <Text style={styles.seeAllText}>See All</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.activityList}>
-                        {recentActivities.length > 0 ? (
-                            recentActivities.map(renderActivityItem)
-                        ) : (
-                            <View style={styles.emptyState}>
-                                <Clock size={32} color="#8E8E93" />
-                                <Text style={styles.emptyStateText}>No recent activity</Text>
                             </View>
-                        )}
-                    </View>
-                </View>
+                        </View>
+                    )}
 
-                {/* Bottom Padding for Tab Bar */}
-                <View style={styles.bottomPadding} />
-            </ScrollView>
-        </SafeAreaView>
+                    {/* Quick Stats Cards */}
+                    <View className="bg-white/80 mx-4 mb-4 rounded-3xl p-5 shadow-xl shadow-black/20 backdrop-blur-xl border border-white/30">
+                        <View className="mb-3">
+                            <Text className="text-xl font-bold text-gray-900 mb-1">{roleContent.title}</Text>
+                            <Text className="text-sm text-gray-500 font-medium">{roleContent.subtitle}</Text>
+                        </View>
+                        
+                        <View className="flex-row justify-between gap-2">
+                            {roleContent.stats.slice(0, 4).map((stat, index) => (
+                                <TouchableOpacity 
+                                    key={index} 
+                                    className="flex-1 bg-slate-50 p-3 rounded-xl items-center border border-gray-200 min-h-[100px]"
+                                    onPress={stat.onPress}
+                                    activeOpacity={0.7}
+                                >
+                                    <View className="w-8 h-8 rounded-2xl justify-center items-center mb-2" style={{ backgroundColor: stat.color + '20' }}>
+                                        {stat.icon}
+                                    </View>
+                                    <Text className="text-lg font-bold text-gray-900 mb-0.5">{stat.value}</Text>
+                                    <Text className="text-xs text-gray-500 font-semibold text-center leading-3">{stat.title}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+
+                    {/* Quick Actions Card */}
+                    {quickActions.length > 0 && (
+                        <View className="bg-white/80 mx-4 mb-4 rounded-3xl p-5 shadow-xl shadow-black/20 backdrop-blur-xl border border-white/30">
+                            <Text className="text-xl font-bold text-gray-900 mb-1">Quick Actions</Text>
+                            <View className="flex-row gap-3 mt-4 justify-between">
+                                {quickActions.map((action, index) => (
+                                    <TouchableOpacity 
+                                        key={index}
+                                        className={`flex-1 flex-row items-center justify-center py-3.5 px-3 rounded-2xl gap-1.5 min-h-[48px] ${
+                                            action.primary 
+                                                ? 'bg-blue-500 shadow-lg shadow-blue-500/30' 
+                                                : 'bg-slate-100 border-2 border-blue-500'
+                                        }`}
+                                        onPress={action.onPress}
+                                        activeOpacity={0.8}
+                                    >
+                                        <View>
+                                            {action.icon}
+                                        </View>
+                                        <Text className={`text-xs font-semibold text-center flex-shrink ${
+                                            action.primary ? 'text-white' : 'text-blue-500'
+                                        }`}>
+                                            {action.text}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Recent Activity Card */}
+                    <View className="bg-white/80 mx-4 mb-36 rounded-3xl p-5 shadow-xl shadow-black/20 backdrop-blur-xl border border-white/30">
+                        <View className="mb-3 flex-row justify-between items-center">
+                            <Text className="text-xl font-bold text-gray-900 mb-1">Recent Activity</Text>
+                            <TouchableOpacity onPress={() => router.push('/(root)/(tabs)/history')}>
+                                <Text className="text-sm text-blue-500 font-semibold">See All</Text>
+                            </TouchableOpacity>
+                        </View>
+                        
+                        <View>
+                            {recentActivities.length > 0 ? (
+                                recentActivities.slice(0, 3).map(renderActivityItem)
+                            ) : (
+                                <View className="items-center py-8">
+                                    <Clock size={24} color="#8E8E93" />
+                                    <Text className="text-sm text-gray-400 mt-2 font-medium">No recent activity</Text>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+
+                    {/* Bottom spacing for tab bar */}
+                    <View className="h-30" />
+                </ScrollView>
+            </View>
+        </View>
     );
 };
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F2F2F7',
-    },
-    scrollView: {
-        flex: 1,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 20,
-        backgroundColor: '#FFFFFF',
-    },
-    greeting: {
-        fontSize: 16,
-        color: '#8E8E93',
-        marginBottom: 4,
-    },
-    userName: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#000000',
-    },
-    notificationButton: {
-        position: 'relative',
-        padding: 8,
-    },
-    notificationBadge: {
-        position: 'absolute',
-        top: 4,
-        right: 4,
-        backgroundColor: '#FF3B30',
-        borderRadius: 10,
-        width: 20,
-        height: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    badgeText: {
-        color: '#FFFFFF',
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    quickActions: {
-        flexDirection: 'row',
-        paddingHorizontal: 20,
-        paddingVertical: 20,
-        gap: 12,
-    },
-    quickActionButton: {
-        flex: 1,
-        backgroundColor: '#007AFF',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 16,
-        borderRadius: 12,
-        gap: 8,
-    },
-    secondaryAction: {
-        backgroundColor: '#F2F2F7',
-        borderWidth: 1,
-        borderColor: '#007AFF',
-    },
-    quickActionText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    secondaryActionText: {
-        color: '#007AFF',
-    },
-    statsContainer: {
-        paddingHorizontal: 20,
-        paddingBottom: 20,
-    },
-    sectionTitle: {
-        fontSize: 20,
-        fontWeight: '600',
-        color: '#000000',
-        marginBottom: 16,
-    },
-    statsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
-    },
-    statCard: {
-        width: (width - 52) / 2,
-        backgroundColor: '#FFFFFF',
-        padding: 16,
-        borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    statHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    statIconContainer: {
-        width: 40,
-        height: 40,
-        backgroundColor: '#F2F2F7',
-        borderRadius: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    statChange: {
-        fontSize: 12,
-        color: '#34C759',
-        fontWeight: '600',
-    },
-    statValue: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#000000',
-        marginBottom: 4,
-    },
-    statTitle: {
-        fontSize: 14,
-        color: '#8E8E93',
-    },
-    activityContainer: {
-        paddingHorizontal: 20,
-        paddingBottom: 20,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    seeAllText: {
-        fontSize: 16,
-        color: '#007AFF',
-        fontWeight: '500',
-    },
-    activityList: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    activityItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F2F2F7',
-    },
-    activityIcon: {
-        width: 40,
-        height: 40,
-        backgroundColor: '#F2F2F7',
-        borderRadius: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    activityContent: {
-        flex: 1,
-    },
-    activityTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#000000',
-        marginBottom: 4,
-    },
-    activitySubtitle: {
-        fontSize: 14,
-        color: '#8E8E93',
-    },
-    activityTime: {
-        fontSize: 12,
-        color: '#8E8E93',
-    },
-    bottomPadding: {
-        height: 100,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    loadingText: {
-        marginTop: 16,
-        fontSize: 16,
-        color: '#8E8E93',
-    },
-    roleHeader: {
-        backgroundColor: '#FFFFFF',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E5EA',
-    },
-    roleTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#000000',
-    },
-    roleSubtitle: {
-        fontSize: 14,
-        color: '#8E8E93',
-        marginTop: 2,
-    },
-    locationStatus: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#F0FDF4',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        marginHorizontal: 20,
-        marginTop: 12,
-        borderRadius: 8,
-        borderLeftWidth: 3,
-        borderLeftColor: '#10B981',
-    },
-    locationText: {
-        fontSize: 12,
-        color: '#10B981',
-        marginLeft: 6,
-        fontWeight: '500',
-    },
-    primaryAction: {
-        backgroundColor: '#007AFF',
-    },
-    emptyState: {
-        alignItems: 'center',
-        paddingVertical: 40,
-    },
-    emptyStateText: {
-        fontSize: 16,
-        color: '#8E8E93',
-        marginTop: 8,
-    },
-});
+
 
 export default Home;

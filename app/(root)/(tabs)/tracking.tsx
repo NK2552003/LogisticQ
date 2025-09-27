@@ -15,9 +15,9 @@ import {
 } from 'react-native';
 import { useUser } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import * as Clipboard from 'expo-clipboard';
+import MapView from '../../components/MapView';
 import { 
     Search, 
     Package, 
@@ -387,73 +387,43 @@ const TrackingScreen = () => {
         const centerLat = coordinates.reduce((sum, coord) => sum + coord.latitude, 0) / coordinates.length;
         const centerLng = coordinates.reduce((sum, coord) => sum + coord.longitude, 0) / coordinates.length;
 
+        // Prepare markers for our custom MapView
+        const mapMarkers = [
+            {
+                id: 'pickup',
+                latitude: shipmentDetails.pickup_latitude || centerLat,
+                longitude: shipmentDetails.pickup_longitude || centerLng,
+                title: 'Pickup Location',
+                status: 'active' as const
+            },
+            {
+                id: 'delivery',
+                latitude: shipmentDetails.delivery_latitude || centerLat,
+                longitude: shipmentDetails.delivery_longitude || centerLng,
+                title: 'Delivery Location',
+                status: 'pending' as const
+            },
+            ...trackingEvents
+                .filter(event => event.latitude && event.longitude)
+                .map((event, index) => ({
+                    id: event.id,
+                    latitude: event.latitude,
+                    longitude: event.longitude,
+                    title: event.status.replace('_', ' ').toUpperCase(),
+                    status: event.status === 'delivered' ? 'completed' as const : 
+                           event.status === 'picked_up' ? 'active' as const : 'pending' as const
+                }))
+        ];
+
         return (
             <View style={styles.mapContainer}>
                 <MapView
-                    provider={PROVIDER_GOOGLE}
-                    style={styles.map}
-                    initialRegion={{
-                        latitude: centerLat,
-                        longitude: centerLng,
-                        latitudeDelta: 0.05,
-                        longitudeDelta: 0.05,
-                    }}
-                >
-                    {/* Pickup Marker */}
-                    <Marker
-                        coordinate={{
-                            latitude: shipmentDetails.pickup_latitude,
-                            longitude: shipmentDetails.pickup_longitude,
-                        }}
-                        title="Pickup Location"
-                        description={shipmentDetails.pickup_address}
-                        pinColor="#10B981"
-                    />
-
-                    {/* Delivery Marker */}
-                    <Marker
-                        coordinate={{
-                            latitude: shipmentDetails.delivery_latitude,
-                            longitude: shipmentDetails.delivery_longitude,
-                        }}
-                        title="Delivery Location"
-                        description={shipmentDetails.delivery_address}
-                        pinColor="#EF4444"
-                    />
-
-                    {/* Tracking Events Markers */}
-                    {trackingEvents.map((event, index) => {
-                        if (!event.latitude || !event.longitude) return null;
-                        return (
-                            <Marker
-                                key={event.id}
-                                coordinate={{
-                                    latitude: event.latitude,
-                                    longitude: event.longitude,
-                                }}
-                                title={event.status.replace('_', ' ').toUpperCase()}
-                                description={`${formatDateTime(event.timestamp).date} ${formatDateTime(event.timestamp).time}`}
-                            >
-                                <View style={[
-                                    styles.customMarker,
-                                    { backgroundColor: getStatusColor(event.status) }
-                                ]}>
-                                    <Text style={styles.markerText}>{index + 1}</Text>
-                                </View>
-                            </Marker>
-                        );
-                    })}
-
-                    {/* Route Polyline */}
-                    {coordinates.length > 1 && (
-                        <Polyline
-                            coordinates={coordinates}
-                            strokeColor="#007AFF"
-                            strokeWidth={3}
-                            lineDashPattern={[5, 5]}
-                        />
-                    )}
-                </MapView>
+                    latitude={centerLat}
+                    longitude={centerLng}
+                    markers={mapMarkers}
+                    height={400}
+                    onMapReady={() => console.log('Tracking map ready!')}
+                />
             </View>
         );
     };
@@ -654,7 +624,7 @@ const TrackingScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F2F2F7',
+        backgroundColor: '#F8FAFC',
     },
     header: {
         flexDirection: 'row',

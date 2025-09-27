@@ -27,3 +27,5 @@ export const GoogleIcon: React.FC<GoogleIconProps> = ({ size = 20 }) => {
     </Svg>
   );
 };
+
+export default GoogleIcon;

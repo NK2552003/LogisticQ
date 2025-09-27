@@ -7,6 +7,26 @@ if (typeof window === 'undefined') {
 
 const sql = neon(`${process.env.DATABASE_URL}`);
 
+// Serialize dates to avoid JSON serialization issues
+function serializeData(data: any): any {
+  if (Array.isArray(data)) {
+    return data.map(serializeData);
+  } else if (data && typeof data === 'object') {
+    const serialized: any = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value instanceof Date) {
+        serialized[key] = value.toISOString();
+      } else if (value && typeof value === 'object') {
+        serialized[key] = serializeData(value);
+      } else {
+        serialized[key] = value;
+      }
+    }
+    return serialized;
+  }
+  return data;
+}
+
 export async function GET(request: Request) {
   try {
     console.log('🔍 Tracking API endpoint called - GET /tracking');
@@ -14,11 +34,20 @@ export async function GET(request: Request) {
     // Check if DATABASE_URL is configured
     if (!process.env.DATABASE_URL) {
       console.error('❌ DATABASE_URL environment variable is not set');
-      return Response.json({
-        success: false,
-        error: 'Database configuration error',
-        details: 'DATABASE_URL environment variable is not set. Please check your .env file.'
-      }, { status: 500 });
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Database configuration error',
+          details: 'DATABASE_URL environment variable is not set. Please check your .env file.'
+        }),
+        {
+          status: 500,
+          headers: { 
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache'
+          },
+        }
+      );
     }
 
     const url = new URL(request.url);
@@ -27,10 +56,12 @@ export async function GET(request: Request) {
 
     console.log('📋 Query parameters:', { shipmentId, driverId });
 
+    let tracking;
+
     if (shipmentId) {
       // Get tracking info for specific shipment
       console.log('🔍 Fetching tracking for shipment:', shipmentId);
-      const tracking = await sql`
+      tracking = await sql`
         SELECT 
           te.id,
           te.shipment_id,
@@ -44,7 +75,8 @@ export async function GET(request: Request) {
           s.pickup_address,
           s.delivery_address,
           s.status as shipment_status,
-          u.name as driver_name,
+          u.first_name as driver_first_name,
+          u.last_name as driver_last_name,
           u.phone as driver_phone
         FROM tracking_events te
         JOIN shipments s ON te.shipment_id = s.id
@@ -54,13 +86,10 @@ export async function GET(request: Request) {
       `;
       
       console.log('✅ Found', tracking.length, 'tracking records for shipment');
-      return Response.json({ success: true, data: tracking || [] });
-    }
-
-    if (driverId) {
+    } else if (driverId) {
       // Get all tracking for driver
       console.log('🔍 Fetching tracking for driver:', driverId);
-      const tracking = await sql`
+      tracking = await sql`
         SELECT 
           te.id,
           te.shipment_id,
@@ -82,49 +111,127 @@ export async function GET(request: Request) {
       `;
       
       console.log('✅ Found', tracking.length, 'tracking records for driver');
-      return Response.json({ success: true, data: tracking || [] });
+    } else {
+      // Get all recent tracking data
+      console.log('🔍 Fetching all recent tracking data');
+      tracking = await sql`
+        SELECT 
+          te.id,
+          te.shipment_id,
+          te.event_type,
+          te.status,
+          te.description as notes,
+          te.location,
+          te.coordinates[0] as longitude,
+          te.coordinates[1] as latitude,
+          te.timestamp,
+          s.pickup_address,
+          s.delivery_address,
+          s.status as shipment_status,
+          u.first_name as driver_first_name,
+          u.last_name as driver_last_name
+        FROM tracking_events te
+        JOIN shipments s ON te.shipment_id = s.id
+        LEFT JOIN users u ON s.driver_id = u.id
+        ORDER BY te.timestamp DESC
+        LIMIT 100
+      `;
+
+      console.log('✅ Found', tracking.length, 'total tracking records');
     }
 
-    // Get all recent tracking data
-    console.log('🔍 Fetching all recent tracking data');
-    const tracking = await sql`
-      SELECT 
-        te.id,
-        te.shipment_id,
-        te.event_type,
-        te.status,
-        te.description as notes,
-        te.location,
-        te.coordinates[0] as longitude,
-        te.coordinates[1] as latitude,
-        te.timestamp,
-        s.pickup_address,
-        s.delivery_address,
-        s.status as shipment_status,
-        u.name as driver_name
-      FROM tracking_events te
-      JOIN shipments s ON te.shipment_id = s.id
-      LEFT JOIN users u ON s.driver_id = u.id
-      ORDER BY te.timestamp DESC
-      LIMIT 100
-    `;
+    // Serialize the data to avoid JSON issues
+    const serializedTracking = serializeData(tracking || []);
 
-    console.log('✅ Found', tracking.length, 'total tracking records');
-    return Response.json({ success: true, data: tracking || [] });
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        data: serializedTracking,
+        count: tracking?.length || 0
+      }),
+      {
+        status: 200,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+      }
+    );
   } catch (error) {
     console.error('❌ Tracking API error:', error);
-    return Response.json({ 
-      success: false, 
-      error: 'Failed to fetch tracking data',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    console.error('❌ Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
+    
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: 'Failed to fetch tracking data',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      }),
+      {
+        status: 500,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+      }
+    );
   }
 }
 
 export async function POST(request: Request) {
   try {
     console.log('🔍 Tracking API endpoint called - POST /tracking');
-    const { shipmentId, latitude, longitude, status, notes, eventType, location } = await request.json();
+    
+    // Check if DATABASE_URL is configured
+    if (!process.env.DATABASE_URL) {
+      console.error('❌ DATABASE_URL environment variable is not set');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Database configuration error',
+          details: 'DATABASE_URL environment variable is not set'
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      console.error('❌ Failed to parse request body:', error);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Invalid JSON in request body',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const { shipmentId, latitude, longitude, status, notes, eventType, location } = body;
+
+    // Validate required fields
+    if (!shipmentId) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Missing required field: shipmentId'
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     console.log('📝 Creating tracking event:', { shipmentId, latitude, longitude, status, eventType });
 
@@ -134,10 +241,10 @@ export async function POST(request: Request) {
       ) VALUES (
         ${shipmentId}, 
         ${eventType || 'update'}, 
-        ${status}, 
+        ${status || 'in_transit'}, 
         ${notes || 'Location updated'}, 
         ${location || 'En route'},
-        POINT(${longitude}, ${latitude}), 
+        POINT(${longitude || 0}, ${latitude || 0}), 
         NOW()
       )
       RETURNING 
@@ -152,24 +259,59 @@ export async function POST(request: Request) {
         timestamp
     `;
 
-    // Update shipment status if provided
-    if (status) {
-      await sql`
-        UPDATE shipments 
-        SET status = ${status}, updated_at = NOW()
-        WHERE id = ${shipmentId}
-      `;
-      console.log('✅ Updated shipment status to:', status);
+    if (result.length === 0) {
+      throw new Error('Failed to create tracking event - no data returned');
     }
 
-    console.log('✅ Tracking event created successfully');
-    return Response.json({ success: true, data: result[0] });
+    // Update shipment status if provided
+    if (status) {
+      try {
+        await sql`
+          UPDATE shipments 
+          SET status = ${status}, updated_at = NOW()
+          WHERE id = ${shipmentId}
+        `;
+        console.log('✅ Updated shipment status to:', status);
+      } catch (error) {
+        console.warn('⚠️ Could not update shipment status:', error);
+      }
+    }
+
+    const serializedResult = serializeData(result[0]);
+    console.log('✅ Tracking event created successfully:', serializedResult);
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        data: serializedResult,
+        message: 'Tracking event created successfully'
+      }),
+      {
+        status: 201,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+      }
+    );
   } catch (error) {
     console.error('❌ Tracking POST error:', error);
-    return Response.json({ 
-      success: false, 
-      error: 'Failed to update tracking',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    console.error('❌ Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
+    
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: 'Failed to update tracking',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      }),
+      {
+        status: 500,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+      }
+    );
   }
 }

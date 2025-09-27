@@ -52,3 +52,5 @@ export const FormInput: React.FC<FormInputProps> = ({
     </View>
   );
 };
+
+export default FormInput;

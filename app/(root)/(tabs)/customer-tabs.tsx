@@ -15,38 +15,41 @@ const CustomerTabsLayout = () => {
             initialRouteName='home'
             screenOptions={{
                 tabBarActiveTintColor: '#8B5CF6', // Purple theme for customer
-                tabBarInactiveTintColor: '#8E8E93',
+                tabBarInactiveTintColor: '#64748B',
                 headerShown: false,
                 tabBarStyle: {
-                    backgroundColor: '#F2F2F7',
-                    borderTopWidth: 0,
-                    height: Platform.OS === 'ios' ? 88 : 65,
-                    paddingBottom: Platform.OS === 'ios' ? 25 : 10,
-                    paddingTop: 8,
+                    backgroundColor: '#FFFFFF',
+                    borderTopWidth: 1,
+                    borderTopColor: '#E2E8F0',
+                    height: Platform.OS === 'ios' ? 88 : 70,
+                    paddingBottom: Platform.OS === 'ios' ? 25 : 12,
+                    paddingTop: 12,
                     shadowColor: '#000',
                     shadowOffset: {
                         width: 0,
-                        height: -2,
+                        height: -4,
                     },
                     shadowOpacity: 0.1,
-                    shadowRadius: 8,
-                    elevation: 8,
-                    borderRadius: 12,
-                    marginHorizontal: 10,
-                    marginBottom: Platform.OS === 'ios' ? 0 : 10,
+                    shadowRadius: 16,
+                    elevation: 12,
+                    borderRadius: 20,
+                    marginHorizontal: 16,
+                    marginBottom: Platform.OS === 'ios' ? 0 : 16,
                     position: 'absolute',
                 },
                 tabBarLabelStyle: {
-                    fontSize: 10,
-                    fontWeight: '500',
-                    marginTop: 2,
+                    fontSize: 11,
+                    fontWeight: '600',
+                    marginTop: 4,
                 },
                 tabBarIconStyle: {
-                    marginTop: -4,
-                    marginBottom: -2
+                    marginTop: -2,
+                    marginBottom: 0
                 },
                 tabBarItemStyle: {
-                    paddingVertical: 4,
+                    paddingVertical: 8,
+                    borderRadius: 12,
+                    marginHorizontal: 4,
                 },
             }}
         >

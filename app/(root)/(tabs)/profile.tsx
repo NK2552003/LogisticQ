@@ -66,7 +66,13 @@ const Profile = () => {
             title: 'Personal Information',
             subtitle: 'Update your personal details',
             icon: <User size={20} color="#007AFF" />,
-            action: () => console.log('Personal Info'),
+            action: () => {
+                Alert.alert(
+                    'Personal Information',
+                    'Edit your personal details here. This feature is coming soon!',
+                    [{ text: 'OK' }]
+                );
+            },
             showArrow: true
         },
         {
@@ -78,7 +84,14 @@ const Profile = () => {
             rightComponent: (
                 <Switch
                     value={notificationsEnabled}
-                    onValueChange={setNotificationsEnabled}
+                    onValueChange={(value) => {
+                        setNotificationsEnabled(value);
+                        Alert.alert(
+                            'Notifications',
+                            value ? 'Push notifications enabled' : 'Push notifications disabled',
+                            [{ text: 'OK' }]
+                        );
+                    }}
                     trackColor={{ false: '#E5E5EA', true: '#007AFF' }}
                     thumbColor="#FFFFFF"
                 />
@@ -93,7 +106,14 @@ const Profile = () => {
             rightComponent: (
                 <Switch
                     value={locationEnabled}
-                    onValueChange={setLocationEnabled}
+                    onValueChange={(value) => {
+                        setLocationEnabled(value);
+                        Alert.alert(
+                            'Location Services',
+                            value ? 'Location tracking enabled' : 'Location tracking disabled',
+                            [{ text: 'OK' }]
+                        );
+                    }}
                     trackColor={{ false: '#E5E5EA', true: '#007AFF' }}
                     thumbColor="#FFFFFF"
                 />
@@ -104,7 +124,16 @@ const Profile = () => {
             title: 'Security & Privacy',
             subtitle: 'Manage your account security',
             icon: <Shield size={20} color="#007AFF" />,
-            action: () => console.log('Security'),
+            action: () => {
+                Alert.alert(
+                    'Security & Privacy',
+                    'Manage your password, two-factor authentication, and privacy settings.',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Open Settings', onPress: () => console.log('Open security settings') }
+                    ]
+                );
+            },
             showArrow: true
         },
         {
@@ -112,7 +141,17 @@ const Profile = () => {
             title: 'Help & Support',
             subtitle: 'Get help and contact support',
             icon: <HelpCircle size={20} color="#007AFF" />,
-            action: () => console.log('Help'),
+            action: () => {
+                Alert.alert(
+                    'Help & Support',
+                    'Need assistance? We\'re here to help!',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Contact Support', onPress: () => console.log('Contact support') },
+                        { text: 'View FAQ', onPress: () => console.log('View FAQ') }
+                    ]
+                );
+            },
             showArrow: true
         }
     ];

@@ -87,7 +87,7 @@ const CallLogsScreen = () => {
     };
 
     const renderCallLogItem = (item: CallLog) => (
-        <TouchableOpacity key={item.id} style={styles.callLogItem}>
+        <TouchableOpacity key={item.id} style={styles.callLogItem} activeOpacity={0.7}>
             <View style={styles.callIconContainer}>
                 {getCallIcon(item.type)}
             </View>
@@ -135,24 +135,25 @@ const CallLogsScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F2F2F7',
+        backgroundColor: '#F8FAFC',
     },
     header: {
-        paddingHorizontal: 20,
+        paddingHorizontal: 24,
         paddingVertical: 20,
         backgroundColor: '#FFFFFF',
         borderBottomWidth: 1,
-        borderBottomColor: '#E5E5EA',
+        borderBottomColor: '#E2E8F0',
     },
     headerTitle: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: '#000000',
+        color: '#1E293B',
         marginBottom: 4,
     },
     headerSubtitle: {
         fontSize: 16,
-        color: '#8E8E93',
+        color: '#64748B',
+        fontWeight: '500',
     },
     scrollView: {
         flex: 1,
@@ -164,40 +165,44 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FFFFFF',
-        padding: 16,
+        padding: 20,
         marginBottom: 12,
-        borderRadius: 12,
+        borderRadius: 16,
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
-            height: 2,
+            height: 4,
         },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 8,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
     },
     callIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#F2F2F7',
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        backgroundColor: '#F8FAFC',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        marginRight: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
     },
     callInfoContainer: {
         flex: 1,
-        marginRight: 12,
+        marginRight: 16,
     },
     contactName: {
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: '600',
-        color: '#000000',
+        color: '#1E293B',
         marginBottom: 4,
     },
     phoneNumber: {
         fontSize: 14,
-        color: '#8E8E93',
+        color: '#64748B',
         marginBottom: 4,
     },
     callDetails: {

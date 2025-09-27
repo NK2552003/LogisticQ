@@ -32,3 +32,5 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
     </TouchableOpacity>
   );
 };
+
+export default PrimaryButton;

@@ -1,4 +1,4 @@
-import React from "react";
+ import React from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 
 interface AuthFooterProps {
@@ -25,3 +25,5 @@ export const AuthFooter: React.FC<AuthFooterProps> = ({
     </View>
   );
 };
+
+export default AuthFooter;

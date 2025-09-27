@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     SafeAreaView,
     Linking,
+    Alert,
 } from 'react-native';
 import { 
     Phone, 
@@ -74,13 +75,53 @@ const HelplineScreen = () => {
         }
     ];
 
-    const handlePhoneCall = (phoneNumber: string) => {
-        const cleanNumber = phoneNumber.replace(/[^\d+]/g, '');
-        Linking.openURL(`tel:${cleanNumber}`);
+    const handlePhoneCall = async (phoneNumber: string) => {
+        try {
+            const cleanNumber = phoneNumber.replace(/[^\d+()-]/g, '');
+            const url = `tel:${cleanNumber}`;
+            
+            const canOpen = await Linking.canOpenURL(url);
+            if (canOpen) {
+                await Linking.openURL(url);
+            } else {
+                Alert.alert(
+                    'Cannot Make Call',
+                    'Your device does not support phone calls or the number is invalid.',
+                    [{ text: 'OK' }]
+                );
+            }
+        } catch (error) {
+            console.error('Error making phone call:', error);
+            Alert.alert(
+                'Call Failed',
+                'Unable to make the call. Please try again.',
+                [{ text: 'OK' }]
+            );
+        }
     };
 
-    const handleEmail = (email: string) => {
-        Linking.openURL(`mailto:${email}`);
+    const handleEmail = async (email: string) => {
+        try {
+            const url = `mailto:${email}`;
+            const canOpen = await Linking.canOpenURL(url);
+            
+            if (canOpen) {
+                await Linking.openURL(url);
+            } else {
+                Alert.alert(
+                    'Cannot Send Email',
+                    'No email app is configured on your device.',
+                    [{ text: 'OK' }]
+                );
+            }
+        } catch (error) {
+            console.error('Error opening email:', error);
+            Alert.alert(
+                'Email Failed',
+                'Unable to open email app. Please try again.',
+                [{ text: 'OK' }]
+            );
+        }
     };
 
     const getCardStyle = (type: string) => {

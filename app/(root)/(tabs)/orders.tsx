@@ -450,13 +450,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 20,
         marginVertical: 16,
         borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
+        boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.05)',
         elevation: 2,
     },
     statItem: {
@@ -486,13 +480,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         padding: 16,
         marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
+        boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.05)',
         elevation: 2,
     },
     orderHeader: {
