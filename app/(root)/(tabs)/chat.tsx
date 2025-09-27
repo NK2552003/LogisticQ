@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -8,6 +8,11 @@ import {
     SafeAreaView,
     TextInput,
     Image,
+    FlatList,
+    KeyboardAvoidingView,
+    Platform,
+    Alert,
+    Linking,
 } from 'react-native';
 import { 
     Search, 
@@ -18,8 +23,14 @@ import {
     Send,
     Paperclip,
     Camera,
-    Mic
+    Mic,
+    ArrowLeft,
+    Plus,
+    Check,
+    CheckCheck,
+    Clock
 } from 'lucide-react-native';
+import { fetchAPI } from '../../lib/fetch';
 
 interface ChatContact {
     id: string;
@@ -44,6 +55,215 @@ const Chat = () => {
     const [selectedChat, setSelectedChat] = useState<string | null>(null);
     const [messageText, setMessageText] = useState('');
     const [searchText, setSearchText] = useState('');
+    const [chatMessages, setChatMessages] = useState<Message[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [typing, setTyping] = useState(false);
+    const scrollViewRef = useRef<ScrollView>(null);
+    const flatListRef = useRef<FlatList>(null);
+
+    // Load messages when chat is selected
+    useEffect(() => {
+        if (selectedChat) {
+            loadMessages(selectedChat);
+        }
+    }, [selectedChat]);
+
+    // Mock data for when API is unavailable
+    const loadMessages = async (chatId: string) => {
+        setLoading(true);
+        try {
+            // Try to fetch from API first
+            try {
+                const response = await fetchAPI(`/chat/messages?chatId=${chatId}`);
+                if (response.messages) {
+                    setChatMessages(response.messages);
+                } else {
+                    setChatMessages(getMockMessages(chatId));
+                }
+            } catch (apiError) {
+                console.log('API unavailable, using mock data');
+                setChatMessages(getMockMessages(chatId));
+            }
+        } catch (error) {
+            console.error('Error loading messages:', error);
+            setChatMessages(getMockMessages(chatId));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const getMockMessages = (chatId: string): Message[] => {
+        const mockMessagesMap: Record<string, Message[]> = {
+            '1': [
+                {
+                    id: '1',
+                    text: 'Hi! I have a delivery scheduled for today. What time should I expect it?',
+                    time: '10:30 AM',
+                    isMe: false,
+                    status: 'read'
+                },
+                {
+                    id: '2',
+                    text: 'Hello! Your delivery is scheduled between 2-4 PM today. I\'ll send you a notification when I\'m 15 minutes away.',
+                    time: '10:32 AM',
+                    isMe: true,
+                    status: 'delivered'
+                },
+                {
+                    id: '3',
+                    text: 'Perfect! I\'ll be home all afternoon. Should I prepare anything?',
+                    time: '10:33 AM',
+                    isMe: false,
+                    status: 'read'
+                },
+                {
+                    id: '4',
+                    text: 'Just have someone available to receive the package. It requires a signature.',
+                    time: '10:34 AM',
+                    isMe: true,
+                    status: 'delivered'
+                },
+                {
+                    id: '5',
+                    text: 'Got it! Thank you for the update.',
+                    time: '10:35 AM',
+                    isMe: false,
+                    status: 'read'
+                }
+            ],
+            '2': [
+                {
+                    id: '1',
+                    text: 'Hey, I\'m running about 10 minutes late due to traffic. Still good to deliver?',
+                    time: '2:45 PM',
+                    isMe: false,
+                    status: 'read'
+                },
+                {
+                    id: '2',
+                    text: 'No problem! I\'m flexible with timing. Take your time and drive safely.',
+                    time: '2:46 PM',
+                    isMe: true,
+                    status: 'delivered'
+                },
+                {
+                    id: '3',
+                    text: 'Thanks for understanding! ETA is now 3:10 PM.',
+                    time: '2:47 PM',
+                    isMe: false,
+                    status: 'read'
+                }
+            ]
+        };
+        
+        return mockMessagesMap[chatId] || [];
+    };
+
+    const sendMessage = async () => {
+        if (!messageText.trim() || !selectedChat) return;
+
+        const newMessage: Message = {
+            id: Date.now().toString(),
+            text: messageText.trim(),
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isMe: true,
+            status: 'sent'
+        };
+
+        // Add message to local state immediately
+        setChatMessages(prev => [...prev, newMessage]);
+        setMessageText('');
+
+        // Scroll to bottom
+        setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+
+        try {
+            // Try to send via API
+            const response = await fetchAPI('/chat/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chatId: selectedChat,
+                    message: newMessage.text,
+                    timestamp: new Date().toISOString()
+                })
+            });
+
+            if (response.success) {
+                // Update message status to delivered
+                setChatMessages(prev => 
+                    prev.map(msg => 
+                        msg.id === newMessage.id 
+                            ? { ...msg, status: 'delivered' }
+                            : msg
+                    )
+                );
+            }
+        } catch (error) {
+            console.log('API unavailable, message sent locally only');
+        }
+
+        // Simulate typing indicator and response for demo
+        if (selectedChat === '1' || selectedChat === '2') {
+            setTyping(true);
+            setTimeout(() => {
+                setTyping(false);
+                const autoReply: Message = {
+                    id: (Date.now() + 1).toString(),
+                    text: selectedChat === '1' 
+                        ? 'Thanks for your message! I\'ll get back to you shortly.' 
+                        : 'Received! Let me check on that for you.',
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    isMe: false,
+                    status: 'delivered'
+                };
+                setChatMessages(prev => [...prev, autoReply]);
+                setTimeout(() => {
+                    flatListRef.current?.scrollToEnd({ animated: true });
+                }, 100);
+            }, 2000);
+        }
+    };
+
+    const makeCall = async (contact: ChatContact) => {
+        // Simulate phone number based on contact type
+        const phoneNumbers = {
+            'customer': '+1 (555) 123-4567',
+            'driver': '+1 (555) 987-6543',
+            'support': '+1 (555) 456-7890',
+            'team': '+1 (555) 321-0987'
+        };
+
+        const phoneNumber = phoneNumbers[contact.type];
+        
+        Alert.alert(
+            'Call Contact',
+            `Call ${contact.name}?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                    text: 'Call', 
+                    onPress: () => Linking.openURL(`tel:${phoneNumber}`)
+                }
+            ]
+        );
+    };
+
+    const startVideoCall = (contact: ChatContact) => {
+        Alert.alert(
+            'Video Call',
+            `Start video call with ${contact.name}?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                    text: 'Start Call', 
+                    onPress: () => Alert.alert('Feature Coming Soon', 'Video calling will be available in a future update.')
+                }
+            ]
+        );
+    };
 
     const chatContacts: ChatContact[] = [
         {
@@ -98,7 +318,8 @@ const Chat = () => {
         }
     ];
 
-    const messages: Message[] = [
+    // Mock messages data - will be replaced with API calls
+    const mockMessages: Message[] = [
         {
             id: '1',
             text: 'Hello! I wanted to check on my delivery status.',
@@ -179,18 +400,48 @@ const Chat = () => {
         </TouchableOpacity>
     );
 
+    const getStatusIcon = (status: string) => {
+        switch (status) {
+            case 'sent':
+                return <Check size={12} color="#8E8E93" />;
+            case 'delivered':
+                return <CheckCheck size={12} color="#8E8E93" />;
+            case 'read':
+                return <CheckCheck size={12} color="#007AFF" />;
+            default:
+                return <Clock size={12} color="#8E8E93" />;
+        }
+    };
+
     const renderMessage = (message: Message) => (
         <View key={message.id} style={[
             styles.messageContainer,
             message.isMe ? styles.myMessage : styles.theirMessage
         ]}>
-            <Text style={[
-                styles.messageText,
-                message.isMe ? styles.myMessageText : styles.theirMessageText
+            <View style={[
+                styles.messageBubble,
+                message.isMe ? styles.myMessageBubble : styles.theirMessageBubble
             ]}>
-                {message.text}
-            </Text>
-            <Text style={styles.messageTime}>{message.time}</Text>
+                <Text style={[
+                    styles.messageText,
+                    message.isMe ? styles.myMessageText : styles.theirMessageText
+                ]}>
+                    {message.text}
+                </Text>
+                <View style={styles.messageFooter}>
+                    <Text style={[
+                        styles.messageTime,
+                        message.isMe ? styles.myMessageTime : styles.theirMessageTime
+                    ]}>
+                        {message.time}
+                    </Text>
+                    {message.isMe && (
+                        <View style={styles.messageStatus}>
+                            {getStatusIcon(message.status)}
+                        </View>
+                    )}
+                </View>
+            </View>
         </View>
     );
 
@@ -228,7 +479,7 @@ const Chat = () => {
 
                 {/* Messages */}
                 <ScrollView style={styles.messagesContainer}>
-                    {messages.map(renderMessage)}
+                    {(selectedChat ? chatMessages : mockMessages).map(renderMessage)}
                 </ScrollView>
 
                 {/* Message Input */}
@@ -515,6 +766,116 @@ const styles = StyleSheet.create({
         backgroundColor: '#007AFF',
         borderRadius: 20,
         padding: 8,
+    },
+    
+    // Enhanced message styles
+    messageBubble: {
+        maxWidth: '80%',
+        borderRadius: 18,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        marginVertical: 2,
+    },
+    myMessageBubble: {
+        backgroundColor: '#007AFF',
+        borderBottomRightRadius: 4,
+        alignSelf: 'flex-end',
+    },
+    theirMessageBubble: {
+        backgroundColor: '#E5E5EA',
+        borderBottomLeftRadius: 4,
+        alignSelf: 'flex-start',
+    },
+    messageFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        marginTop: 4,
+        gap: 4,
+    },
+    myMessageTime: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.7)',
+    },
+    theirMessageTime: {
+        fontSize: 12,
+        color: '#8E8E93',
+    },
+    messageStatus: {
+        marginLeft: 4,
+    },
+    
+    // Chat header styles
+    contactAvatarContainer: {
+        position: 'relative',
+        marginRight: 12,
+    },
+    contactAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F2F2F7',
+        textAlign: 'center',
+        lineHeight: 40,
+        fontSize: 16,
+    },
+    contactTextInfo: {
+        flex: 1,
+    },
+    
+    // Chat body
+    chatBody: {
+        flex: 1,
+    },
+    
+    // Typing indicator
+    typingIndicator: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+    },
+    typingBubble: {
+        backgroundColor: '#E5E5EA',
+        borderRadius: 18,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        alignSelf: 'flex-start',
+        maxWidth: '80%',
+    },
+    typingDots: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    typingDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#8E8E93',
+    },
+    typingDot1: {
+        opacity: 0.4,
+    },
+    typingDot2: {
+        opacity: 0.6,
+    },
+    typingDot3: {
+        opacity: 0.8,
+    },
+    
+    // Input container styles
+    textInputContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        backgroundColor: '#F2F2F7',
+        borderRadius: 20,
+        paddingRight: 8,
+    },
+    
+    // Chat back button
+    chatBackButton: {
+        padding: 8,
+        marginRight: 8,
     },
 });
 

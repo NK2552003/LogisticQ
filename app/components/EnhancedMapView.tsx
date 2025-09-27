@@ -29,7 +29,7 @@ const EnhancedMapView: React.FC<MapViewProps> = ({
     height = 300,
     onMapReady,
     showControls = false,
-    zoom = 12,
+    zoom = 20,
     enableFullscreen = false
 }) => {
     const webViewRef = useRef<WebView>(null);
@@ -193,6 +193,22 @@ const EnhancedMapView: React.FC<MapViewProps> = ({
                     font-size: 14px;
                 }
                 
+                .popup-role {
+                    font-size: 10px;
+                    color: #6B7280;
+                    text-transform: uppercase;
+                    font-weight: 500;
+                    margin-bottom: 2px;
+                    letter-spacing: 0.5px;
+                }
+                
+                .popup-info {
+                    font-size: 11px;
+                    color: #374151;
+                    margin-bottom: 4px;
+                    font-style: italic;
+                }
+                
                 .popup-status {
                     font-size: 11px;
                     padding: 2px 8px;
@@ -233,7 +249,7 @@ const EnhancedMapView: React.FC<MapViewProps> = ({
             <script>
                 let currentTileLayer;
                 
-                // Initialize map
+                // Initialize map with proper zoom settings
                 const map = L.map('map', {
                     zoomControl: false,
                     attributionControl: false,
@@ -241,8 +257,10 @@ const EnhancedMapView: React.FC<MapViewProps> = ({
                     doubleClickZoom: true,
                     touchZoom: true,
                     dragging: true,
-                    preferCanvas: true
-                }).setView([${latitude}, ${longitude}], ${zoom});
+                    preferCanvas: true,
+                    maxZoom: 19,
+                    minZoom: 8
+                }).setView([${latitude}, ${longitude}], Math.max(${zoom}, 16));
 
                 // Add initial tile layer
                 function addTileLayer(url) {
@@ -327,6 +345,8 @@ const EnhancedMapView: React.FC<MapViewProps> = ({
                         .bindPopup(\`
                             <div class="custom-popup">
                                 <div class="popup-title">\${marker.title}</div>
+                                \${marker.role ? '<div class="popup-role">' + marker.role.charAt(0).toUpperCase() + marker.role.slice(1) + '</div>' : ''}
+                                \${marker.additional_info ? '<div class="popup-info">' + marker.additional_info + '</div>' : ''}
                                 <div class="popup-status status-\${marker.status || 'completed'}">
                                     \${marker.status || 'completed'}
                                 </div>
@@ -342,35 +362,53 @@ const EnhancedMapView: React.FC<MapViewProps> = ({
                     const targetPoint = map.latLngToContainerPoint([${latitude}, ${longitude}]);
                     targetPoint.y -= offsetY;
                     const targetLatLng = map.containerPointToLatLng(targetPoint);
-                    map.setView(targetLatLng, ${zoom + 2}, { animate: true });
+                    
+                    // Use optimal zoom for clear visibility while maintaining context
+                    const targetZoom = Math.max(17, ${zoom} + 2);
+                    map.setView(targetLatLng, targetZoom, { animate: true, duration: 1 });
                     userMarker.openPopup();
                 }
 
-                // Set initial view with user location at 1/3 from top
+                // Set initial view with user location focused and optimal zoom
                 setTimeout(() => {
+                    // Ensure minimum zoom level for clear visibility on screen
+                    const targetZoom = ${zoom} < 16 ? 16 : Math.min(${zoom}, 18);
+                    
+                    // Position user location at 1/3 from top of screen
                     const offsetY = window.innerHeight * 0.17;
                     const targetPoint = map.latLngToContainerPoint([${latitude}, ${longitude}]);
                     targetPoint.y -= offsetY;
                     const targetLatLng = map.containerPointToLatLng(targetPoint);
-                    map.setView(targetLatLng, ${zoom}, { animate: false });
+                    
+                    map.setView(targetLatLng, targetZoom, { animate: false });
+                    
+                    // Only fit bounds if there are many distant markers
+                    if (markers.length > 5) {
+                        setTimeout(() => {
+                            const userLatLng = L.latLng(${latitude}, ${longitude});
+                            const nearbyMarkers = markerObjects.filter(marker => {
+                                const markerLatLng = marker.getLatLng();
+                                const distance = userLatLng.distanceTo(markerLatLng);
+                                return distance < 5000; // 5km radius
+                            });
+                            
+                            if (nearbyMarkers.length > 0) {
+                                const group = new L.featureGroup([userMarker, ...nearbyMarkers]);
+                                const bounds = group.getBounds().pad(0.3);
+                                
+                                // Ensure minimum zoom level for location detail
+                                const boundsZoom = map.getBoundsZoom(bounds);
+                                const finalZoom = Math.max(boundsZoom, 14);
+                                
+                                map.fitBounds(bounds, { 
+                                    maxZoom: finalZoom,
+                                    animate: true,
+                                    duration: 1
+                                });
+                            }
+                        }, 2000);
+                    }
                 }, 500);
-
-                // Fit map to show all markers with better padding, considering the offset
-                if (markers.length > 0) {
-                    setTimeout(() => {
-                        const allMarkers = [userMarker, ...markerObjects];
-                        const group = new L.featureGroup(allMarkers);
-                        const bounds = group.getBounds().pad(0.2);
-                        
-                        // Adjust bounds to account for cards overlay
-                        const southWest = bounds.getSouthWest();
-                        const northEast = bounds.getNorthEast();
-                        const adjustedSouthWest = L.latLng(southWest.lat - 0.01, southWest.lng);
-                        const adjustedBounds = L.latLngBounds(adjustedSouthWest, northEast);
-                        
-                        map.fitBounds(adjustedBounds);
-                    }, 1000);
-                }
 
                 // Enhanced map interactions
                 map.on('zoomend', function() {

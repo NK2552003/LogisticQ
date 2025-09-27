@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,10 @@ import {
     TextInput,
     Modal,
     Alert,
+    FlatList,
+    RefreshControl,
+    ActivityIndicator,
+    Linking,
 } from 'react-native';
 import { 
     Plus, 
@@ -24,8 +28,15 @@ import {
     MapPin,
     User,
     Phone,
-    DollarSign
+    DollarSign,
+    Eye,
+    Edit,
+    X,
+    ChevronDown,
+    TrendingUp,
+    BarChart3
 } from 'lucide-react-native';
+import { fetchAPI } from '../../lib/fetch';
 
 interface Order {
     id: string;
@@ -53,11 +64,52 @@ interface Order {
 
 const OrdersScreen = () => {
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedFilter, setSelectedFilter] = useState('all');
+    const [selectedFilter, setSelectedFilter] = useState<'all' | 'pending' | 'confirmed' | 'in-transit' | 'delivered'>('all');
     const [showFilterModal, setShowFilterModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [showOrderModal, setShowOrderModal] = useState(false);
+    const [orders, setOrders] = useState<Order[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const orders: Order[] = [
+    useEffect(() => {
+        loadOrders();
+    }, []);
+
+    const loadOrders = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            
+            // Try to fetch from API first
+            try {
+                const response = await fetchAPI('/orders');
+                if (response.orders) {
+                    setOrders(response.orders);
+                } else {
+                    setOrders(getMockOrders());
+                }
+            } catch (apiError) {
+                console.log('API unavailable, using mock data');
+                setOrders(getMockOrders());
+            }
+        } catch (error) {
+            console.error('Error loading orders:', error);
+            setError('Failed to load orders');
+            setOrders(getMockOrders());
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await loadOrders();
+        setRefreshing(false);
+    };
+
+    const getMockOrders = (): Order[] => [
         {
             id: '1',
             orderNumber: 'ORD-2024-001',
@@ -311,7 +363,7 @@ const OrdersScreen = () => {
                                     selectedFilter === option.value && styles.selectedFilter
                                 ]}
                                 onPress={() => {
-                                    setSelectedFilter(option.value);
+                                    setSelectedFilter(option.value as 'all' | 'pending' | 'confirmed' | 'in-transit' | 'delivered');
                                     setShowFilterModal(false);
                                 }}
                             >

@@ -1,0 +1,187 @@
+// Test HTML file to verify map zoom behavior
+// This can be opened in a browser to test the map zoom levels
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogisticQ Map Zoom Test</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { 
+            margin: 0; 
+            padding: 20px; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .test-container {
+            margin-bottom: 30px;
+        }
+        .test-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #1F2937;
+        }
+        .map-container { 
+            height: 300px;
+            width: 100%; 
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid #E5E7EB;
+            margin-bottom: 10px;
+        }
+        .info {
+            background: #F3F4F6;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #6B7280;
+        }
+        .zoom-info {
+            background: #EEF2FF;
+            color: #3730A3;
+            padding: 8px;
+            border-radius: 6px;
+            margin-top: 5px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <h1>LogisticQ Map Zoom Tests</h1>
+    <p>Testing different zoom levels and behaviors for exact location viewing</p>
+
+    <!-- Test 1: High Zoom Level (18) -->
+    <div class="test-container">
+        <div class="test-title">Test 1: High Zoom Level (18) - Street Level Detail</div>
+        <div id="map1" class="map-container"></div>
+        <div class="info">
+            This map should show street-level detail with buildings visible
+            <div class="zoom-info" id="info1">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Test 2: Medium Zoom Level (15) -->
+    <div class="test-container">
+        <div class="test-title">Test 2: Medium Zoom Level (15) - Neighborhood View</div>
+        <div id="map2" class="map-container"></div>
+        <div class="info">
+            This map should show neighborhood-level detail with street names
+            <div class="zoom-info" id="info2">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Test 3: Dynamic Zoom - Focuses on User Location -->
+    <div class="test-container">
+        <div class="test-title">Test 3: Dynamic Zoom - Auto Focus on Location</div>
+        <div id="map3" class="map-container"></div>
+        <div class="info">
+            This map automatically adjusts zoom to show exact location clearly
+            <div class="zoom-info" id="info3">Loading...</div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Test coordinates (San Francisco)
+        const testLat = 37.7749;
+        const testLng = -122.4194;
+
+        // Test 1: High Zoom (18)
+        const map1 = L.map('map1', {
+            zoomControl: true,
+            scrollWheelZoom: true,
+            maxZoom: 19,
+            minZoom: 10
+        }).setView([testLat, testLng], 18);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19
+        }).addTo(map1);
+
+        L.marker([testLat, testLng])
+            .addTo(map1)
+            .bindPopup('High Zoom (18) - Street Level Detail')
+            .openPopup();
+
+        map1.on('zoomend', () => {
+            document.getElementById('info1').textContent = `Current zoom: ${map1.getZoom()} - ${map1.getZoom() >= 16 ? 'Excellent detail' : 'Consider higher zoom'}`;
+        });
+
+        // Test 2: Medium Zoom (15)
+        const map2 = L.map('map2', {
+            zoomControl: true,  
+            scrollWheelZoom: true,
+            maxZoom: 19,
+            minZoom: 10
+        }).setView([testLat, testLng], 15);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19
+        }).addTo(map2);
+
+        L.marker([testLat, testLng])
+            .addTo(map2)
+            .bindPopup('Medium Zoom (15) - Neighborhood View');
+
+        map2.on('zoomend', () => {
+            document.getElementById('info2').textContent = `Current zoom: ${map2.getZoom()} - ${map2.getZoom() >= 14 ? 'Good visibility' : 'Too far out'}`;
+        });
+
+        // Test 3: Dynamic Zoom with Auto Focus
+        const map3 = L.map('map3', {
+            zoomControl: true,
+            scrollWheelZoom: true,  
+            maxZoom: 19,
+            minZoom: 10
+        }).setView([testLat, testLng], 12);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19
+        }).addTo(map3);
+
+        const userMarker = L.marker([testLat, testLng])
+            .addTo(map3)
+            .bindPopup('Dynamic Zoom - Auto Focused');
+
+        // Simulate the LogisticQ behavior
+        setTimeout(() => {
+            const targetZoom = 17; // High zoom for precise location
+            map3.setView([testLat, testLng], targetZoom, { animate: true, duration: 1 });
+            userMarker.openPopup();
+        }, 1000);
+
+        map3.on('zoomend', () => {
+            const zoom = map3.getZoom();
+            let quality = 'Too far';
+            if (zoom >= 18) quality = 'Perfect detail';
+            else if (zoom >= 16) quality = 'Excellent detail';
+            else if (zoom >= 14) quality = 'Good visibility';
+            else if (zoom >= 12) quality = 'Basic visibility';
+            
+            document.getElementById('info3').textContent = `Current zoom: ${zoom} - ${quality}`;
+        });
+
+        // Add some nearby markers to test 3
+        const nearbyMarkers = [
+            { lat: testLat + 0.002, lng: testLng + 0.002, title: 'Nearby Location 1' },
+            { lat: testLat - 0.001, lng: testLng + 0.003, title: 'Nearby Location 2' },
+            { lat: testLat + 0.0015, lng: testLng - 0.002, title: 'Nearby Location 3' }
+        ];
+
+        nearbyMarkers.forEach(marker => {
+            L.marker([marker.lat, marker.lng])
+                .addTo(map3)
+                .bindPopup(marker.title);
+        });
+
+        // Initial info updates
+        setTimeout(() => {
+            document.getElementById('info1').textContent = `Current zoom: ${map1.getZoom()} - Excellent detail`;
+            document.getElementById('info2').textContent = `Current zoom: ${map2.getZoom()} - Good visibility`;
+            document.getElementById('info3').textContent = `Current zoom: ${map3.getZoom()} - Will auto-focus to zoom 17`;
+        }, 500);
+    </script>
+</body>
+</html>

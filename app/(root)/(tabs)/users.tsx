@@ -52,6 +52,13 @@ interface UserData {
     total_jobs?: number;
     created_at: string;
     updated_at: string;
+    // Location fields
+    current_latitude?: string;
+    current_longitude?: string;
+    is_available?: boolean;
+    is_verified?: boolean;
+    display_name?: string;
+    location_status?: string;
 }
 
 const UsersScreen = () => {
@@ -94,8 +101,10 @@ const UsersScreen = () => {
     const fetchUsers = async () => {
         try {
             setLoading(true);
-            const response = await fetchAPI('/users');
+            // Fetch users with location data for admin dashboard
+            const response = await fetchAPI('/users?includeLocation=true');
             if (response.success) {
+                console.log('✅ Fetched users with location data:', response.data?.length || 0);
                 setUsers(response.data || []);
             }
         } catch (error) {
@@ -354,6 +363,35 @@ const UsersScreen = () => {
                             Jobs Completed: {userData.total_jobs}
                         </Text>
                     )}
+                    
+                    {/* Location Information */}
+                    <View style={styles.locationInfo}>
+                        <View style={styles.availabilityContainer}>
+                            <View style={[
+                                styles.availabilityDot, 
+                                { backgroundColor: userData.is_available ? '#10B981' : '#F59E0B' }
+                            ]} />
+                            <Text style={styles.availabilityText}>
+                                {userData.is_available ? 'Available' : 'Busy'}
+                            </Text>
+                        </View>
+                        
+                        {userData.current_latitude && userData.current_longitude ? (
+                            <View style={styles.coordinatesContainer}>
+                                <MapPin size={12} color="#10B981" />
+                                <Text style={styles.coordinatesText}>
+                                    {parseFloat(userData.current_latitude).toFixed(4)}, {parseFloat(userData.current_longitude).toFixed(4)}
+                                </Text>
+                            </View>
+                        ) : (
+                            <View style={styles.coordinatesContainer}>
+                                <MapPin size={12} color="#F59E0B" />
+                                <Text style={[styles.coordinatesText, { color: '#F59E0B' }]}>
+                                    Location not available
+                                </Text>
+                            </View>
+                        )}
+                    </View>
                 </View>
             )}
 
@@ -769,6 +807,36 @@ const styles = StyleSheet.create({
         color: '#8E8E93',
         textAlign: 'center',
         lineHeight: 20,
+    },
+    // Location-related styles
+    locationInfo: {
+        marginTop: 8,
+        gap: 6,
+    },
+    availabilityContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    availabilityDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    availabilityText: {
+        fontSize: 12,
+        color: '#8E8E93',
+        fontWeight: '500',
+    },
+    coordinatesContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    coordinatesText: {
+        fontSize: 11,
+        color: '#10B981',
+        fontFamily: 'monospace',
     },
 });
 

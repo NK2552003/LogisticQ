@@ -41,8 +41,24 @@ const MapView: React.FC<MapViewProps> = ({
             <title>Map</title>
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
             <style>
-                body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-                #map { height: 100vh; width: 100%; }
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                html, body { 
+                    height: 100%; 
+                    width: 100%; 
+                    margin: 0; 
+                    padding: 0; 
+                    overflow: hidden;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background-color: #E5E7EB;
+                }
+                #map { 
+                    height: 100vh; 
+                    width: 100vw; 
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    background-color: #E5E7EB;
+                }
                 .custom-marker {
                     background: white;
                     border-radius: 50%;
@@ -67,6 +83,20 @@ const MapView: React.FC<MapViewProps> = ({
                     margin-bottom: 4px;
                     color: #1F2937;
                 }
+                .popup-role {
+                    font-size: 10px;
+                    color: #6B7280;
+                    text-transform: uppercase;
+                    font-weight: 500;
+                    margin-bottom: 2px;
+                    letter-spacing: 0.5px;
+                }
+                .popup-info {
+                    font-size: 11px;
+                    color: #374151;
+                    margin-bottom: 4px;
+                    font-style: italic;
+                }
                 .popup-status {
                     font-size: 11px;
                     padding: 2px 6px;
@@ -84,15 +114,17 @@ const MapView: React.FC<MapViewProps> = ({
             <div id="map"></div>
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
             <script>
-                // Initialize map
+                // Initialize map with proper zoom settings
                 const map = L.map('map', {
                     zoomControl: true,
                     attributionControl: false,
                     scrollWheelZoom: true,
                     doubleClickZoom: true,
                     touchZoom: true,
-                    dragging: true
-                }).setView([${latitude}, ${longitude}], 12);
+                    dragging: true,
+                    maxZoom: 19,
+                    minZoom: 10
+                }).setView([${latitude}, ${longitude}], Math.max(15, 16));
 
                 // Add tile layer with modern dark style
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -126,17 +158,46 @@ const MapView: React.FC<MapViewProps> = ({
                         .addTo(map)
                         .bindPopup(\`
                             <div class="popup-title">\${marker.title}</div>
+                            \${marker.role ? '<div class="popup-role">' + marker.role.charAt(0).toUpperCase() + marker.role.slice(1) + '</div>' : ''}
+                            \${marker.additional_info ? '<div class="popup-info">' + marker.additional_info + '</div>' : ''}
                             <div class="popup-status status-\${marker.status || 'completed'}">\${marker.status || 'completed'}</div>
                         \`);
                 });
 
-                // Fit map to show all markers
-                if (markers.length > 0) {
-                    const group = new L.featureGroup([
-                        L.marker([${latitude}, ${longitude}]),
-                        ...markers.map(m => L.marker([m.latitude, m.longitude]))
-                    ]);
-                    map.fitBounds(group.getBounds().pad(0.1));
+                // Set initial high zoom focused on user location
+                setTimeout(() => {
+                    const targetZoom = 16; // High zoom for precise location viewing
+                    map.setView([${latitude}, ${longitude}], targetZoom, { animate: false });
+                }, 500);
+
+                // Only fit bounds if there are many markers and they're far apart
+                if (markers.length > 3) {
+                    setTimeout(() => {
+                        const userLatLng = L.latLng(${latitude}, ${longitude});
+                        const nearbyMarkers = markers.filter(marker => {
+                            const markerLatLng = L.latLng(marker.latitude, marker.longitude);
+                            const distance = userLatLng.distanceTo(markerLatLng);
+                            return distance < 3000; // 3km radius
+                        });
+                        
+                        if (nearbyMarkers.length > 0) {
+                            const group = new L.featureGroup([
+                                L.marker([${latitude}, ${longitude}]),
+                                ...nearbyMarkers.map(m => L.marker([m.latitude, m.longitude]))
+                            ]);
+                            const bounds = group.getBounds().pad(0.2);
+                            
+                            // Ensure minimum zoom level for location detail
+                            const boundsZoom = map.getBoundsZoom(bounds);
+                            const finalZoom = Math.max(boundsZoom, 14);
+                            
+                            map.fitBounds(bounds, { 
+                                maxZoom: finalZoom,
+                                animate: true,
+                                duration: 1
+                            });
+                        }
+                    }, 2000);
                 }
 
                 // Notify React Native when map is ready
@@ -186,13 +247,20 @@ const styles = StyleSheet.create({
     container: {
         borderRadius: 16,
         overflow: 'hidden',
-        backgroundColor: '#F3F4F6',
+        backgroundColor: '#E5E7EB', // Lighter gray fallback
         elevation: 4,
-        boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
     },
     webView: {
         flex: 1,
-        backgroundColor: 'transparent',
+        backgroundColor: '#E5E7EB', // Match container background
+        opacity: 0.99, // Helps with rendering issues on some devices
     },
 });
 

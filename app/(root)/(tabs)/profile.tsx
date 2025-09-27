@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -8,6 +8,10 @@ import {
     SafeAreaView,
     Switch,
     Alert,
+    ActivityIndicator,
+    TextInput,
+    Modal,
+    Image,
 } from 'react-native';
 import { useUser, useAuth } from "@clerk/clerk-expo";
 import { 
@@ -24,8 +28,16 @@ import {
     Phone,
     Mail,
     Camera,
-    Edit3
+    Edit3,
+    Truck,
+    Package,
+    DollarSign,
+    Calendar,
+    TrendingUp,
+    CheckCircle,
+    Clock
 } from 'lucide-react-native';
+import { fetchAPI } from '../../lib/fetch';
 
 interface ProfileOption {
     id: string;
@@ -37,11 +49,260 @@ interface ProfileOption {
     rightComponent?: React.ReactNode;
 }
 
+interface UserProfile {
+    id: string;
+    role: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone?: string;
+    name?: string;
+    profile_image_url?: string;
+    profile_completed: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+interface BusinessProfile {
+    company_name?: string;
+    business_type?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip_code?: string;
+    tax_id?: string;
+}
+
+interface TransporterProfile {
+    vehicle_type?: string;
+    vehicle_make?: string;
+    vehicle_model?: string;
+    vehicle_year?: number;
+    license_plate?: string;
+    driver_license?: string;
+    vehicle_capacity_kg?: number;
+    is_verified?: boolean;
+    rating?: number;
+    total_deliveries?: number;
+    is_available?: boolean;
+}
+
+interface CustomerProfile {
+    preferred_delivery_address?: string;
+    delivery_instructions?: string;
+}
+
+interface ProfileStats {
+    totalOrders?: number;
+    completedDeliveries?: number;
+    totalEarnings?: number;
+    rating?: number;
+    joinDate?: string;
+    activeOrders?: number;
+}
+
 const Profile = () => {
     const { user } = useUser();
     const { signOut } = useAuth();
-    const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
-    const [locationEnabled, setLocationEnabled] = React.useState(true);
+    
+    // State Management
+    const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+    const [locationEnabled, setLocationEnabled] = useState(true);
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
+    const [transporterProfile, setTransporterProfile] = useState<TransporterProfile | null>(null);
+    const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
+    const [profileStatsData, setProfileStatsData] = useState<ProfileStats>({});
+    const [loading, setLoading] = useState(true);
+    const [editing, setEditing] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editingField, setEditingField] = useState<string>('');
+    const [editValue, setEditValue] = useState<string>('');
+
+    // Mock data for when API is unavailable
+    const mockProfileStats = {
+        totalOrders: 247,
+        completedDeliveries: 234,
+        totalEarnings: 8640,
+        rating: 4.8,
+        joinDate: 'Jan 2022',
+        activeOrders: 3
+    };
+
+    const mockBusinessProfile = {
+        company_name: 'Sample Logistics Co.',
+        business_type: 'Transportation',
+        address: '123 Business Street',
+        city: 'San Francisco',
+        state: 'CA',
+        zip_code: '94105',
+        tax_id: 'XX-XXXXXXX'
+    };
+
+    const mockTransporterProfile = {
+        vehicle_type: 'Truck',
+        vehicle_make: 'Ford',
+        vehicle_model: 'Transit',
+        vehicle_year: 2022,
+        license_plate: 'ABC123',
+        driver_license: 'DL123456789',
+        vehicle_capacity_kg: 1500,
+        is_verified: true,
+        rating: 4.8,
+        total_deliveries: 234,
+        is_available: true
+    };
+
+    useEffect(() => {
+        fetchUserProfile();
+    }, [user?.id]);
+
+    const fetchUserProfile = async () => {
+        if (!user?.id) {
+            setLoading(false);
+            return;
+        }
+
+        try {
+            setLoading(true);
+            
+            // Try to fetch from API first
+            try {
+                const response = await fetchAPI(`/user?clerkUserId=${user.id}`);
+                if (response.user) {
+                    setUserProfile(response.user);
+                    
+                    // Fetch role-specific profile data
+                    if (response.user.role === 'business') {
+                        await fetchBusinessProfile(response.user.id);
+                    } else if (response.user.role === 'transporter') {
+                        await fetchTransporterProfile(response.user.id);
+                    } else if (response.user.role === 'customer') {
+                        await fetchCustomerProfile(response.user.id);
+                    }
+                    
+                    await fetchProfileStats(response.user.id, response.user.role);
+                } else {
+                    // Use mock data if no user found
+                    useMockData();
+                }
+            } catch (apiError) {
+                console.log('API unavailable, using mock data');
+                useMockData();
+            }
+        } catch (error) {
+            console.error('Error fetching profile:', error);
+            useMockData();
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const useMockData = () => {
+        // Create mock user profile
+        const mockUser: UserProfile = {
+            id: 'mock-id',
+            role: 'transporter',
+            first_name: user?.firstName || 'John',
+            last_name: user?.lastName || 'Driver',
+            email: user?.primaryEmailAddress?.emailAddress || 'john.driver@example.com',
+            phone: '+1 (555) 123-4567',
+            name: `${user?.firstName || 'John'} ${user?.lastName || 'Driver'}`,
+            profile_image_url: user?.imageUrl,
+            profile_completed: true,
+            created_at: '2022-01-15T10:00:00Z',
+            updated_at: new Date().toISOString()
+        };
+        
+        setUserProfile(mockUser);
+        setProfileStatsData(mockProfileStats);
+        setTransporterProfile(mockTransporterProfile);
+        setBusinessProfile(mockBusinessProfile);
+    };
+
+    const fetchBusinessProfile = async (userId: string) => {
+        try {
+            const response = await fetchAPI(`/user/business-profile?userId=${userId}`);
+            if (response.profile) {
+                setBusinessProfile(response.profile);
+            }
+        } catch (error) {
+            console.error('Error fetching business profile:', error);
+            setBusinessProfile(mockBusinessProfile);
+        }
+    };
+
+    const fetchTransporterProfile = async (userId: string) => {
+        try {
+            const response = await fetchAPI(`/user/transporter-profile?userId=${userId}`);
+            if (response.profile) {
+                setTransporterProfile(response.profile);
+            }
+        } catch (error) {
+            console.error('Error fetching transporter profile:', error);
+            setTransporterProfile(mockTransporterProfile);
+        }
+    };
+
+    const fetchCustomerProfile = async (userId: string) => {
+        try {
+            const response = await fetchAPI(`/user/customer-profile?userId=${userId}`);
+            if (response.profile) {
+                setCustomerProfile(response.profile);
+            }
+        } catch (error) {
+            console.error('Error fetching customer profile:', error);
+        }
+    };
+
+    const fetchProfileStats = async (userId: string, role: string) => {
+        try {
+            const response = await fetchAPI(`/user/stats?userId=${userId}&role=${role}`);
+            if (response.stats) {
+                setProfileStatsData(response.stats);
+            }
+        } catch (error) {
+            console.error('Error fetching profile stats:', error);
+            setProfileStatsData(mockProfileStats);
+        }
+    };
+
+    const updateProfile = async (field: string, value: string) => {
+        try {
+            const response = await fetchAPI('/user/update-profile', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: userProfile?.id,
+                    field,
+                    value
+                })
+            });
+            
+            if (response.success) {
+                // Update local state
+                setUserProfile(prev => prev ? { ...prev, [field]: value } : null);
+                Alert.alert('Success', 'Profile updated successfully');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to update profile');
+        }
+    };
+
+    const handleEditField = (field: string, currentValue: string) => {
+        setEditingField(field);
+        setEditValue(currentValue);
+        setShowEditModal(true);
+    };
+
+    const saveEditedField = () => {
+        if (editingField && editValue.trim()) {
+            updateProfile(editingField, editValue.trim());
+        }
+        setShowEditModal(false);
+        setEditingField('');
+        setEditValue('');
+    };
 
     const handleSignOut = () => {
         Alert.alert(
@@ -54,11 +315,95 @@ const Profile = () => {
         );
     };
 
-    const profileStats = [
-        { label: 'Deliveries', value: '247' },
-        { label: 'Rating', value: '4.8' },
-        { label: 'Years', value: '2.5' }
-    ];
+    const getProfileStats = () => {
+        if (!userProfile) return [];
+        
+        const joinYear = new Date(userProfile.created_at).getFullYear();
+        const currentYear = new Date().getFullYear();
+        const yearsActive = currentYear - joinYear;
+        
+        switch (userProfile.role) {
+            case 'transporter':
+                return [
+                    { 
+                        label: 'Deliveries', 
+                        value: transporterProfile?.total_deliveries?.toString() || profileStatsData.completedDeliveries?.toString() || '0',
+                        icon: <Package size={16} color="#007AFF" />
+                    },
+                    { 
+                        label: 'Rating', 
+                        value: transporterProfile?.rating?.toFixed(1) || profileStatsData.rating?.toFixed(1) || '5.0',
+                        icon: <Star size={16} color="#FF9500" />
+                    },
+                    { 
+                        label: 'Years Active', 
+                        value: yearsActive.toString(),
+                        icon: <Calendar size={16} color="#34C759" />
+                    },
+                    {
+                        label: 'Available',
+                        value: transporterProfile?.is_available ? 'Yes' : 'No',
+                        icon: <CheckCircle size={16} color={transporterProfile?.is_available ? "#34C759" : "#FF3B30"} />
+                    }
+                ];
+            case 'business':
+                return [
+                    { 
+                        label: 'Total Orders', 
+                        value: profileStatsData.totalOrders?.toString() || '0',
+                        icon: <Package size={16} color="#007AFF" />
+                    },
+                    { 
+                        label: 'Active Orders', 
+                        value: profileStatsData.activeOrders?.toString() || '0',
+                        icon: <Clock size={16} color="#FF9500" />
+                    },
+                    { 
+                        label: 'Total Spent', 
+                        value: `$${profileStatsData.totalEarnings?.toLocaleString() || '0'}`,
+                        icon: <DollarSign size={16} color="#34C759" />
+                    },
+                    { 
+                        label: 'Member Since', 
+                        value: profileStatsData.joinDate || `${joinYear}`,
+                        icon: <Calendar size={16} color="#8E8E93" />
+                    }
+                ];
+            case 'customer':
+                return [
+                    { 
+                        label: 'Orders', 
+                        value: profileStatsData.totalOrders?.toString() || '0',
+                        icon: <Package size={16} color="#007AFF" />
+                    },
+                    { 
+                        label: 'Completed', 
+                        value: profileStatsData.completedDeliveries?.toString() || '0',
+                        icon: <CheckCircle size={16} color="#34C759" />
+                    },
+                    { 
+                        label: 'Total Spent', 
+                        value: `$${profileStatsData.totalEarnings?.toLocaleString() || '0'}`,
+                        icon: <DollarSign size={16} color="#34C759" />
+                    },
+                    { 
+                        label: 'Member Since', 
+                        value: profileStatsData.joinDate || `${joinYear}`,
+                        icon: <Calendar size={16} color="#8E8E93" />
+                    }
+                ];
+            default:
+                return [
+                    { 
+                        label: 'Member Since', 
+                        value: `${joinYear}`,
+                        icon: <Calendar size={16} color="#8E8E93" />
+                    }
+                ];
+        }
+    };
+
+    const profileStats = getProfileStats();
 
     const profileOptions: ProfileOption[] = [
         {
@@ -156,9 +501,12 @@ const Profile = () => {
         }
     ];
 
-    const renderStatItem = (stat: { label: string; value: string }, index: number) => (
+    const renderStatItem = (stat: { label: string; value: string; icon?: React.ReactNode }, index: number) => (
         <View key={index} style={styles.statItem}>
-            <Text style={styles.statValue}>{stat.value}</Text>
+            <View style={styles.statHeader}>
+                {stat.icon}
+                <Text style={styles.statValue}>{stat.value}</Text>
+            </View>
             <Text style={styles.statLabel}>{stat.label}</Text>
         </View>
     );
@@ -183,6 +531,17 @@ const Profile = () => {
             </View>
         </TouchableOpacity>
     );
+
+    if (loading) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#007AFF" />
+                    <Text style={styles.loadingText}>Loading profile...</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>
@@ -522,6 +881,130 @@ const styles = StyleSheet.create({
     },
     bottomPadding: {
         height: 100,
+    },
+    
+    // Loading styles
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#F8F9FA',
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 16,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    
+    // Modal styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 24,
+        width: '85%',
+        maxWidth: 400,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#1E293B',
+    },
+    modalCancel: {
+        fontSize: 16,
+        color: '#007AFF',
+        fontWeight: '500',
+    },
+    modalInput: {
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+        marginBottom: 20,
+        color: '#1E293B',
+    },
+    modalSaveButton: {
+        backgroundColor: '#007AFF',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+    },
+    modalSaveText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    
+    // Profile specific styles
+    statHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+        gap: 6,
+    },
+    avatarImage: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+    },
+    vehicleInfo: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 16,
+        gap: 12,
+    },
+    vehicleItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    vehicleText: {
+        fontSize: 15,
+        color: '#374151',
+        flex: 1,
+    },
+    businessInfo: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 16,
+        gap: 12,
+    },
+    businessItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    businessLabel: {
+        fontSize: 14,
+        color: '#6B7280',
+        fontWeight: '500',
+        flex: 1,
+    },
+    businessValue: {
+        fontSize: 14,
+        color: '#374151',
+        fontWeight: '400',
+        flex: 2,
+        textAlign: 'right',
+    },
+    versionSubtext: {
+        fontSize: 12,
+        color: '#C7C7CC',
+        textAlign: 'center',
+        marginTop: 4,
     },
 });
 

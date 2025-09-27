@@ -61,9 +61,14 @@ interface RecentActivity {
 interface UserProfile {
     id: string;
     role: string;
-    name: string;
+    first_name: string;
+    last_name: string;
     email: string;
     phone?: string;
+    clerk_user_id: string;
+    profile_completed: boolean;
+    created_at: string;
+    updated_at: string;
 }
 
 const Home = () => {
@@ -75,6 +80,8 @@ const Home = () => {
     const [dashboardData, setDashboardData] = useState<any>(null);
     const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
     const [location, setLocation] = useState<Location.LocationObject | null>(null);
+    const [allUsers, setAllUsers] = useState<any[]>([]);
+    const [mapMarkers, setMapMarkers] = useState<any[]>([]);
 
     // Fetch user profile and dashboard data
     const fetchDashboardData = useCallback(async () => {
@@ -84,15 +91,22 @@ const Home = () => {
             setIsLoading(true);
             
             // Get user profile
-
-            console.log('Fetching user profile for user ID:', user.id);
+            console.log('🔍 Fetching user profile for user ID:', user.id);
             const userResponse = await fetchAPI(`/user?clerkUserId=${user.id}`);
-            console.log('Fetched user profile:', userResponse)
-            if (userResponse.user) {
+            console.log('✅ Fetched user profile response:', userResponse);
+            
+            if (userResponse && userResponse.user) {
+                console.log('👤 Setting user profile:', userResponse.user);
                 setUserProfile(userResponse.user);
                 
                 // Fetch role-specific dashboard data
+                console.log('📊 Fetching role-specific data for role:', userResponse.user.role);
                 await fetchRoleSpecificData(userResponse.user);
+                
+                // Fetch all users with location data for map display (for admin and all users)
+                await fetchAllUsersWithLocation();
+            } else {
+                console.error('❌ No user data in response:', userResponse);
             }
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
@@ -100,17 +114,109 @@ const Home = () => {
             setIsLoading(false);
         }
     }, [isLoaded, user?.id]);
+
+    // Fetch all users with location data for map display
+    const fetchAllUsersWithLocation = async () => {
+        try {
+            console.log('🗺️ Fetching all users with location data...');
+            const response = await fetchAPI('/users?includeLocation=true');
+            
+            if (response.success && response.data) {
+                console.log('✅ Fetched users with location:', response.data.length);
+                setAllUsers(response.data);
+                
+                // Create map markers from users with location data
+                const markers = response.data
+                    .filter((user: any) => {
+                        // Include transporters with valid coordinates
+                        if (user.role === 'transporter' && user.current_latitude && user.current_longitude) {
+                            return true;
+                        }
+                        // For other roles, we'll use default locations
+                        return user.role !== 'transporter';
+                    })
+                    .map((user: any, index: number) => {
+                        let coordinates = {
+                            latitude: 37.7749, // Default SF coordinates
+                            longitude: -122.4194
+                        };
+                        
+                        // Use actual coordinates for transporters
+                        if (user.role === 'transporter' && user.current_latitude && user.current_longitude) {
+                            coordinates = {
+                                latitude: parseFloat(user.current_latitude),
+                                longitude: parseFloat(user.current_longitude)
+                            };
+                        } else {
+                            // Create nearby locations for non-transporters using user's location as center
+                            const userLat = location?.coords.latitude || 37.7749;
+                            const userLng = location?.coords.longitude || -122.4194;
+                            
+                            coordinates = {
+                                latitude: userLat + (Math.random() - 0.5) * 0.02, // Smaller radius for better grouping
+                                longitude: userLng + (Math.random() - 0.5) * 0.02
+                            };
+                        }
+                        
+                        return {
+                            id: user.id,
+                            latitude: coordinates.latitude,
+                            longitude: coordinates.longitude,
+                            title: user.display_name || `${user.first_name} ${user.last_name}`,
+                            status: user.location_status || 'completed',
+                            role: user.role,
+                            additional_info: user.role === 'transporter' ? 
+                                `${user.vehicle_type} - ${user.is_available ? 'Available' : 'Busy'}` :
+                                user.role.charAt(0).toUpperCase() + user.role.slice(1)
+                        };
+                    });
+                
+                console.log('🗺️ Created map markers:', markers.length);
+                setMapMarkers(markers);
+            }
+        } catch (error) {
+            console.error('Error fetching users with location:', error);
+            // Set some mock markers as fallback
+            setMapMarkers([
+                {
+                    id: '1',
+                    latitude: 37.7749 + 0.01,
+                    longitude: -122.4194 + 0.01,
+                    title: 'Active Delivery',
+                    status: 'active'
+                },
+                {
+                    id: '2',
+                    latitude: 37.7749 - 0.005,
+                    longitude: -122.4194 + 0.015,
+                    title: 'Pending Pickup',
+                    status: 'pending'
+                }
+            ]);
+        }
+    };
+
     const fetchRoleSpecificData = async (profile: UserProfile) => {
         try {
             const role = profile.role;
             let data = {};
 
             if (role === 'transporter') {
-                // Fetch driver earnings, active jobs, ratings
-                const [shipmentsRes, paymentsRes] = await Promise.all([
-                    fetchAPI(`/shipments?driverId=${profile.id}&status=active`),
-                    fetchAPI(`/payments?userId=${profile.id}&role=transporter`)
-                ]);
+                // Fetch driver earnings, active jobs, ratings with individual error handling
+                let shipmentsRes = { data: [] };
+                let paymentsRes = { data: [] };
+                
+                try {
+                    shipmentsRes = await fetchAPI(`/shipments?driverId=${profile.id}&status=active`);
+                } catch (error) {
+                    console.error('Error fetching shipments for transporter:', error);
+                }
+                
+                try {
+                    paymentsRes = await fetchAPI(`/payments?userId=${profile.id}&role=transporter`);
+                } catch (error) {
+                    console.error('Error fetching payments for transporter:', error);
+                }
                 
                 data = {
                     activeJobs: shipmentsRes.data?.length || 0,
@@ -120,8 +226,15 @@ const Home = () => {
                     totalDeliveries: paymentsRes.data?.length || 0
                 };
             } else if (role === 'business' || role === 'customer') {
-                // Fetch shipments data
-                const shipmentsRes = await fetchAPI(`/shipments?customerId=${profile.id}`);
+                // Fetch shipments data with error handling
+                let shipmentsRes = { data: [] };
+                
+                try {
+                    shipmentsRes = await fetchAPI(`/shipments?customerId=${profile.id}`);
+                } catch (error) {
+                    console.error('Error fetching shipments for customer/business:', error);
+                }
+                
                 const shipments = shipmentsRes.data || [];
                 
                 data = {
@@ -132,12 +245,28 @@ const Home = () => {
                     totalShipments: shipments.length
                 };
             } else if (role === 'admin') {
-                // Fetch admin overview data
-                const [usersRes, shipmentsRes, paymentsRes] = await Promise.all([
-                    fetchAPI('/drivers'),
-                    fetchAPI('/shipments'),
-                    fetchAPI('/payments')
-                ]);
+                // Fetch admin overview data with individual error handling
+                let usersRes = { data: [] };
+                let shipmentsRes = { data: [] };
+                let paymentsRes = { data: [] };
+                
+                try {
+                    usersRes = await fetchAPI('/drivers');
+                } catch (error) {
+                    console.error('Error fetching drivers for admin:', error);
+                }
+                
+                try {
+                    shipmentsRes = await fetchAPI('/shipments');
+                } catch (error) {
+                    console.error('Error fetching shipments for admin:', error);
+                }
+                
+                try {
+                    paymentsRes = await fetchAPI('/payments');
+                } catch (error) {
+                    console.error('Error fetching payments for admin:', error);
+                }
                 
                 data = {
                     totalUsers: usersRes.data?.length || 0,
@@ -149,17 +278,30 @@ const Home = () => {
 
             setDashboardData(data);
             
-            // Set recent activities based on role
-            if (role === 'transporter') {
-                const activities = await fetchTransporterActivities(profile.id);
-                setRecentActivities(activities);
-            } else {
-                const activities = await fetchCustomerActivities(profile.id);
-                setRecentActivities(activities);
+            // Set recent activities based on role with error handling
+            try {
+                if (role === 'transporter') {
+                    const activities = await fetchTransporterActivities(profile.id);
+                    setRecentActivities(activities);
+                } else {
+                    const activities = await fetchCustomerActivities(profile.id);
+                    setRecentActivities(activities);
+                }
+            } catch (error) {
+                console.error('Error fetching activities:', error);
+                setRecentActivities([]);
             }
             
         } catch (error) {
             console.error('Error fetching role-specific data:', error);
+            // Set default empty data so the UI doesn't break
+            setDashboardData({
+                activeJobs: 0,
+                todayEarnings: 0,
+                totalEarnings: 0,
+                rating: 0,
+                totalDeliveries: 0
+            });
         }
     };
 
@@ -224,35 +366,42 @@ const Home = () => {
         return `${Math.floor(hours / 24)} days ago`;
     };
 
-    // Location tracking for transporters
+    // Location tracking for all users
     useEffect(() => {
         const setupLocationTracking = async () => {
-            if (userProfile?.role === 'transporter') {
+            if (userProfile) {
                 try {
                     let { status } = await Location.requestForegroundPermissionsAsync();
                     if (status !== 'granted') {
                         Alert.alert(
                             'Location Permission Required',
-                            'Please enable location services to track your deliveries',
+                            'Please enable location services for better map experience',
                             [{ text: 'OK', onPress: () => {} }]
                         );
                         return;
                     }
 
-                    let location = await Location.getCurrentPositionAsync({});
-                    setLocation(location);
+                    let userLocation = await Location.getCurrentPositionAsync({});
+                    setLocation(userLocation);
 
-                    // Update location in database
-                    await fetchAPI('/user/transporter-profile', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            userId: userProfile.id,
-                            current_latitude: location.coords.latitude,
-                            current_longitude: location.coords.longitude,
-                            is_available: true
-                        })
-                    });
+                    // Update location in database for transporters
+                    if (userProfile.role === 'transporter') {
+                        try {
+                            await fetchAPI('/user/transporter-profile', {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    userId: userProfile.id,
+                                    current_latitude: userLocation.coords.latitude,
+                                    current_longitude: userLocation.coords.longitude,
+                                    is_available: true
+                                })
+                            });
+                            console.log('✅ Updated transporter location in database');
+                        } catch (error) {
+                            console.error('Error updating transporter location:', error);
+                        }
+                    }
                 } catch (error) {
                     console.error('Error setting up location tracking:', error);
                 }
@@ -601,32 +750,10 @@ const Home = () => {
                 <EnhancedMapView
                     latitude={location?.coords.latitude || 37.7749}
                     longitude={location?.coords.longitude || -122.4194}
-                    markers={[
-                        {
-                            id: '1',
-                            latitude: (location?.coords.latitude || 37.7749) + 0.01,
-                            longitude: (location?.coords.longitude || -122.4194) + 0.01,
-                            title: 'Active Delivery',
-                            status: 'active'
-                        },
-                        {
-                            id: '2',
-                            latitude: (location?.coords.latitude || 37.7749) - 0.005,
-                            longitude: (location?.coords.longitude || -122.4194) + 0.015,
-                            title: 'Pending Pickup',
-                            status: 'pending'
-                        },
-                        {
-                            id: '3',
-                            latitude: (location?.coords.latitude || 37.7749) + 0.008,
-                            longitude: (location?.coords.longitude || -122.4194) - 0.012,
-                            title: 'Completed',
-                            status: 'completed'
-                        }
-                    ]}
+                    markers={mapMarkers}
                     height={Dimensions.get('window').height}
                     showControls={true}
-                    zoom={16}
+                    zoom={userProfile?.role === 'admin' ? 15 : 17}
                     onMapReady={() => console.log('Enhanced map is ready!')}
                 />
             </View>
@@ -648,7 +775,7 @@ const Home = () => {
                              new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'}
                         </Text>
                         <Text className="text-lg font-bold text-gray-900 mt-0.5">
-                            {userProfile?.name || user?.firstName || 'User'}
+                            {userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : user?.firstName || 'User'}
                         </Text>
                     </View>
                     

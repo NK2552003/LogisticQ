@@ -37,6 +37,32 @@ import {
 } from 'lucide-react-native';
 import { fetchAPI } from '../../lib/fetch';
 
+interface TrackingUpdate {
+    id: string;
+    shipment_id: string;
+    location: any;
+    status: string;
+    description: string;
+    timestamp: string;
+    driver_name?: string;
+    driver_phone?: string;
+    is_milestone: boolean;
+}
+
+interface ShipmentTracking {
+    id: string;
+    order_number: string;
+    pickup_address: string;
+    delivery_address: string;
+    status: string;
+    estimated_delivery: string;
+    customer_name?: string;
+    driver_name?: string;
+    driver_phone?: string;
+    last_update?: string;
+    total_updates?: number;
+}
+
 const { width } = Dimensions.get('window');
 
 interface TrackingEvent {
