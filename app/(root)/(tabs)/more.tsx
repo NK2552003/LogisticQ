@@ -4,8 +4,6 @@ import {
     Text,
     TouchableOpacity,
     StyleSheet,
-    SafeAreaView,
-    StatusBar,
     ScrollView,
     Dimensions,
 } from 'react-native';
@@ -24,6 +22,7 @@ import {
     AlertTriangle
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import SafeAreaWrapper from '../../components/SafeAreaWrapper';
 
 const { width } = Dimensions.get('window');
 
@@ -138,9 +137,7 @@ const MoreScreen = () => {
     );
 
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
-            
+        <SafeAreaWrapper backgroundColor="#F8FAFC">
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>More Options</Text>
@@ -156,7 +153,7 @@ const MoreScreen = () => {
                     {tabOptions.map((tab, index) => renderTabCard(tab, index))}
                 </View>
             </ScrollView>
-        </SafeAreaView>
+        </SafeAreaWrapper>
     );
 };
 

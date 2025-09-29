@@ -4,7 +4,6 @@ import {
     Text,
     ScrollView,
     TouchableOpacity,
-    SafeAreaView,
     Dimensions,
     ActivityIndicator,
     RefreshControl,
@@ -16,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { fetchAPI } from "../../lib/fetch";
 import * as Location from 'expo-location';
 import EnhancedMapView from '../../components/EnhancedMapView';
+import SafeAreaWrapper from '../../components/SafeAreaWrapper';
 import { 
     Package, 
     Truck, 
@@ -427,12 +427,12 @@ const Home = () => {
 
     if (!isLoaded || isLoading) {
         return (
-            <SafeAreaView className="flex-1 bg-slate-50">
+            <SafeAreaWrapper backgroundColor="#F8FAFC">
                 <View className="flex-1 justify-center items-center">
                     <ActivityIndicator size="large" color="#FACC15" />
                     <Text className="mt-4 text-base text-slate-500 font-medium">Loading...</Text>
                 </View>
-            </SafeAreaView>
+            </SafeAreaWrapper>
         );
     }
 
@@ -744,9 +744,9 @@ const Home = () => {
     const quickActions = getQuickActions();
 
     return (
-        <View className="flex-1 bg-black">
+        <SafeAreaWrapper backgroundColor="#000000" excludeBottom={true}>
             {/* Large Map Background - Uber Style */}
-            <View className="absolute top-0 left-0 right-0 bottom-0 z-[1]">
+            <View className="absolute top-10 left-0 right-0 bottom-0 z-[1]">
                 <EnhancedMapView
                     latitude={location?.coords.latitude || 37.7749}
                     longitude={location?.coords.longitude || -122.4194}
@@ -759,7 +759,7 @@ const Home = () => {
             </View>
 
             {/* Top Header Overlay */}
-            <SafeAreaView className="absolute top-10 left-0 right-0 z-10 bg-transparent">
+            <View className="absolute top-16 left-0 right-0 z-10 bg-transparent">
                 <View className="flex-row items-center justify-between px-4 py-3 bg-white/95 mx-4 mt-2 rounded-2xl shadow-lg shadow-black/15 backdrop-blur-xl">
                     <TouchableOpacity className="w-10 h-10 rounded-full overflow-hidden">
                         <Image 
@@ -789,10 +789,10 @@ const Home = () => {
                         </View>
                     </TouchableOpacity>
                 </View>
-            </SafeAreaView>
+            </View>
 
             {/* Bottom Cards Overlay - Above Navbar */}
-            <View className="absolute left-0 right-0 bottom-0 z-[5] bg-transparent" style={{top: Dimensions.get('window').height * 0.63}}>
+            <View className="absolute left-0 right-0 bottom-0 z-[5] bg-transparent" style={{top: Dimensions.get('window').height * 0.53}}>
                 <ScrollView 
                     className="flex-1 pt-4"
                     showsVerticalScrollIndicator={false}
@@ -899,7 +899,7 @@ const Home = () => {
                     <View className="h-30" />
                 </ScrollView>
             </View>
-        </View>
+        </SafeAreaWrapper>
     );
 };
 

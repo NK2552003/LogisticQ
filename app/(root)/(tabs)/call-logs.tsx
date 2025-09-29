@@ -5,7 +5,6 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    SafeAreaView,
     TextInput,
     Linking,
     Alert,
@@ -29,6 +28,7 @@ import {
     Info,
     MessageCircle
 } from 'lucide-react-native';
+import SafeAreaWrapper from '../../components/SafeAreaWrapper';
 
 interface CallLog {
     id: string;
@@ -480,7 +480,7 @@ const CallLogsScreen = () => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaWrapper backgroundColor="#F2F2F7">
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Phone</Text>
                 <Text style={styles.headerSubtitle}>LogisticQ Communications</Text>
@@ -561,7 +561,7 @@ const CallLogsScreen = () => {
                     </View>
                 </View>
             </Modal>
-        </SafeAreaView>
+        </SafeAreaWrapper>
     );
 };
 

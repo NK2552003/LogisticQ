@@ -11,49 +11,15 @@ import {
     Menu
 } from 'lucide-react-native';
 import { Platform, View } from 'react-native';
+import CollapsibleTabBar from '../../components/CollapsibleTabBar';
 
 const Layout = () => {
     return (
         <Tabs
             initialRouteName='home'
+            tabBar={(props) => <CollapsibleTabBar {...props} />}
             screenOptions={{
-                tabBarActiveTintColor: '#FACC15', // Yellow theme
-                tabBarInactiveTintColor: '#64748B',
                 headerShown: false,
-                tabBarStyle: {
-                    backgroundColor: '#FFFFFF',
-                    borderTopWidth: 1,
-                    borderTopColor: '#E2E8F0',
-                    height: Platform.OS === 'ios' ? 88 : 70,
-                    paddingBottom: Platform.OS === 'ios' ? 25 : 12,
-                    paddingTop: 12,
-                    shadowColor: '#000',
-                    shadowOffset: {
-                        width: 0,
-                        height: -4,
-                    },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 16,
-                    elevation: 12,
-                    borderRadius: 20,
-                    marginHorizontal: 16,
-                    marginBottom: Platform.OS === 'ios' ? 0 : 16,
-                    position: 'absolute',
-                },
-                tabBarLabelStyle: {
-                    fontSize: 11,
-                    fontWeight: '600',
-                    marginTop: 4,
-                },
-                tabBarIconStyle: {
-                    marginTop: -12,
-                    marginBottom: 0
-                },
-                tabBarItemStyle: {
-                    paddingVertical: 8,
-                    borderRadius: 12,
-                    marginHorizontal: 4,
-                },
             }}
         >
             <Tabs.Screen 

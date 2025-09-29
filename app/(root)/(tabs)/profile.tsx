@@ -5,7 +5,6 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    SafeAreaView,
     Switch,
     Alert,
     ActivityIndicator,
@@ -38,6 +37,7 @@ import {
     Clock
 } from 'lucide-react-native';
 import { fetchAPI } from '../../lib/fetch';
+import SafeAreaWrapper from '../../components/SafeAreaWrapper';
 
 interface ProfileOption {
     id: string;
@@ -534,17 +534,17 @@ const Profile = () => {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.container}>
+            <SafeAreaWrapper>
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#007AFF" />
                     <Text style={styles.loadingText}>Loading profile...</Text>
                 </View>
-            </SafeAreaView>
+            </SafeAreaWrapper>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaWrapper>
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
                 {/* Header */}
                 <View style={styles.header}>
@@ -630,7 +630,7 @@ const Profile = () => {
                 {/* Bottom Padding */}
                 <View style={styles.bottomPadding} />
             </ScrollView>
-        </SafeAreaView>
+        </SafeAreaWrapper>
     );
 };
 

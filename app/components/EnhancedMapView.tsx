@@ -119,7 +119,7 @@ const EnhancedMapView: React.FC<MapViewProps> = ({
                 
                 .location-button {
                     position: absolute;
-                    bottom: 330px;
+                    bottom: 440px;
                     left: 20px;
                     z-index: 1000;
                     background: rgba(255, 255, 255, 0.95);

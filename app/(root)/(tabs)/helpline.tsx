@@ -5,7 +5,6 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    SafeAreaView,
     Linking,
     Alert,
 } from 'react-native';
@@ -19,6 +18,7 @@ import {
     AlertCircle,
     BookOpen
 } from 'lucide-react-native';
+import SafeAreaWrapper from '../../components/SafeAreaWrapper';
 
 interface HelplineContact {
     id: string;
@@ -186,7 +186,7 @@ const HelplineScreen = () => {
     );
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaWrapper backgroundColor="#F2F2F7">
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Helpline</Text>
                 <Text style={styles.headerSubtitle}>Get help when you need it</Text>
@@ -206,7 +206,7 @@ const HelplineScreen = () => {
                     </Text>
                 </View>
             </ScrollView>
-        </SafeAreaView>
+        </SafeAreaWrapper>
     );
 };
 
